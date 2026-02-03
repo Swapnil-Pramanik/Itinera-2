@@ -23,6 +23,7 @@ flutter:
   assets:
     - assets/images/stitch_itinera/
     - assets/images/
+    - assets/
 
   fonts:
     - family: RobotoMono

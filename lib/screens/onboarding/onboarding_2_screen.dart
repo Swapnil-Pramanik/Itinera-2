@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
 import 'onboarding_3_screen.dart';
 
@@ -14,19 +15,6 @@ class Onboarding2Screen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
           child: Column(
             children: [
-              // Header with logo (consistent with Screen 1)
-              Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 20, bottom: 20),
-                  child: Image.asset(
-                    'assets/images/logo_black.png',
-                    height: 80,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-
               // Header Row with Back Button & Step
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -54,6 +42,38 @@ class Onboarding2Screen extends StatelessWidget {
               ),
 
               const SizedBox(height: 24),
+
+              // Animation
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 0),
+                child: Lottie.asset(
+                  'assets/traveller.json',
+                  height: 250,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.error_outline,
+                              size: 48, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text(
+                            'Animation Unavailable',
+                            style: TextStyle(
+                              fontFamily: 'RobotoMono',
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 16),
 
               // Expanded Content
               Expanded(

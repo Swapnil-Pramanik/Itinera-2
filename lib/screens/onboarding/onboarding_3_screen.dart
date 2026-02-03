@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
 import 'onboarding_completion_screen.dart';
 
@@ -25,19 +26,6 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
           child: Column(
             children: [
-              // Header with logo
-              Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 20),
-                  child: Image.asset(
-                    'assets/images/logo_black.png',
-                    height: 80,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-
               // Header Row with Back Button & Step
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -62,6 +50,38 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
                     ),
                   ),
                 ],
+              ),
+
+              // Animation
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Center(
+                  child: Lottie.asset(
+                    'assets/planning_route.json',
+                    height: 250,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline,
+                                size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
+                            Text(
+                              'Animation Unavailable',
+                              style: TextStyle(
+                                fontFamily: 'RobotoMono',
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
 
               // Scrollable content
