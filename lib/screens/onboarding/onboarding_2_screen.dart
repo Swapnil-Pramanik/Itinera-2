@@ -1,166 +1,198 @@
 import 'package:flutter/material.dart';
-import '../../widgets/buttons/buttons.dart';
-import '../../widgets/common/common.dart';
+
 import 'onboarding_3_screen.dart';
 
-/// Onboarding Screen 2 - "How It Works" with feature list
 class Onboarding2Screen extends StatelessWidget {
   const Onboarding2Screen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-
     return Scaffold(
-      body: Stack(
-        children: [
-          // 1. Full Screen Background
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/onboarding_bg.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.3),
-            ),
-          ),
-
-          // 2. Fixed Logo & App Name
-          Positioned(
-            top: statusBarHeight + 20,
-            left: 0,
-            right: 0,
-            child: Column(
-              children: [
-                Image.asset(
-                  'assets/images/logo_white.png',
-                  height: 64,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Itinera',
-                  style: TextStyle(
-                    fontFamily: 'RobotoMono',
-                    fontSize: 24,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+          child: Column(
+            children: [
+              // Header with logo (consistent with Screen 1)
+              Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 20, bottom: 20),
+                  child: Image.asset(
+                    'assets/images/logo_black.png',
+                    height: 80,
+                    fit: BoxFit.contain,
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
 
-          // 3. Dynamic Bottom Sheet
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: double.infinity,
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.75,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
+              // Header Row with Back Button & Step
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Title
-                  const Text(
-                    'How It Works',
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    style: IconButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  Text(
+                    'STEP 2 OF 4',
                     style: TextStyle(
                       fontFamily: 'RobotoMono',
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Text(
-                    'Effortless travel planning powered by automation.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Feature items
-                  const FeatureItem(
-                    icon: Icons.tune,
-                    title: 'Your Preferences',
-                    description:
-                        'Use our sliders to set your budget, dates, and travel intensity.',
-                  ),
-
-                  const FeatureItem(
-                    icon: Icons.auto_awesome,
-                    title: 'Smart Generation',
-                    description:
-                        'Our AI instantly builds a personalized, day-by-day itinerary.',
-                  ),
-
-                  const FeatureItem(
-                    icon: Icons.toggle_on_outlined,
-                    title: 'Total Control',
-                    description:
-                        'Toggle activities, swap restaurants, and finalize your plan.',
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // Progress dots
-                  const ProgressDots(currentIndex: 1, totalDots: 3),
-
-                  const SizedBox(height: 24),
-
-                  // Continue button
-                  PrimaryButton(
-                    text: 'Continue',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const Onboarding3Screen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Skip button
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const Onboarding3Screen(),
-                        ),
-                      );
-                    },
-                    child: const Text(
-                      'Skip',
-                      style: TextStyle(
-                        fontFamily: 'RobotoMono',
-                        fontSize: 14,
-                      ),
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-            ),
+
+              const SizedBox(height: 24),
+
+              // Expanded Content
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'WHAT IT DOES',
+                        style: TextStyle(
+                          fontFamily: 'RobotoMono',
+                          fontSize: 32,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -1.0,
+                          color: Colors.black,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Feature Items
+                      _buildFeatureItem(
+                        icon: Icons.map_outlined,
+                        title: 'Smart Itineraries',
+                        description:
+                            'Routes optimized for your pace and interests.',
+                      ),
+                      const SizedBox(height: 24),
+                      _buildFeatureItem(
+                        icon: Icons.wb_sunny_outlined,
+                        title: 'Weather Adapted',
+                        description:
+                            'Plans that adjust automatically to the forecast.',
+                      ),
+                      const SizedBox(height: 24),
+                      _buildFeatureItem(
+                        icon: Icons.local_offer_outlined,
+                        title: 'Budget Tracking',
+                        description: 'Real-time cost estimation and tracking.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Bottom Button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const Onboarding3Screen(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'CONTINUE',
+                        style: TextStyle(
+                          fontFamily: 'RobotoMono',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(Icons.arrow_forward, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildFeatureItem({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Icon(icon, size: 28, color: Colors.black),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

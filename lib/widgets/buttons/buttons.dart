@@ -105,7 +105,7 @@ class ChipButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -114,7 +114,8 @@ class ChipButton extends StatelessWidget {
           color: isSelected ? theme.colorScheme.primary : Colors.white,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected ? theme.colorScheme.primary : Colors.grey.shade300,
+            color:
+                isSelected ? theme.colorScheme.primary : Colors.grey.shade300,
           ),
         ),
         child: Row(
@@ -191,4 +192,122 @@ class SocialButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Pill-shaped toggle button for Login/Signup tabs
+class PillToggle extends StatelessWidget {
+  final List<String> options;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  const PillToggle({
+    super.key,
+    required this.options,
+    required this.selectedIndex,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: List.generate(options.length, (index) {
+          final isSelected = index == selectedIndex;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(index),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.black : Colors.transparent,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  options[index],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'RobotoMono',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+/// Line-art paper plane icon widget
+class PaperPlaneIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const PaperPlaneIcon({
+    super.key,
+    this.size = 80,
+    this.color = Colors.white,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _PaperPlanePainter(color: color),
+    );
+  }
+}
+
+class _PaperPlanePainter extends CustomPainter {
+  final Color color;
+
+  _PaperPlanePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+
+    // Paper plane shape - line art style
+    final w = size.width;
+    final h = size.height;
+
+    // Main triangle body
+    path.moveTo(w * 0.1, h * 0.5);
+    path.lineTo(w * 0.9, h * 0.2);
+    path.lineTo(w * 0.5, h * 0.8);
+    path.close();
+
+    // Inner fold line
+    path.moveTo(w * 0.5, h * 0.8);
+    path.lineTo(w * 0.9, h * 0.2);
+
+    // Trail/motion lines
+    path.moveTo(w * 0.05, h * 0.35);
+    path.lineTo(w * 0.2, h * 0.35);
+
+    path.moveTo(w * 0.0, h * 0.5);
+    path.lineTo(w * 0.08, h * 0.5);
+
+    path.moveTo(w * 0.05, h * 0.65);
+    path.lineTo(w * 0.15, h * 0.65);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

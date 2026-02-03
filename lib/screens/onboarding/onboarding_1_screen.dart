@@ -1,117 +1,134 @@
 import 'package:flutter/material.dart';
-import '../../widgets/buttons/buttons.dart';
-import '../../widgets/common/common.dart';
+import 'package:lottie/lottie.dart';
 import 'onboarding_2_screen.dart';
 
-/// Onboarding Screen 1 - Hero image with "Effortless Adaptive Planning"
 class Onboarding1Screen extends StatelessWidget {
   const Onboarding1Screen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-
     return Scaffold(
-      body: Stack(
+      backgroundColor: Colors.white,
+      body: Column(
         children: [
-          // 1. Full Screen Background
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/onboarding_bg.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.3),
-            ),
-          ),
-
-          // 2. Fixed Logo & App Name
-          Positioned(
-            top: statusBarHeight + 20,
-            left: 0,
-            right: 0,
-            child: Column(
-              children: [
-                Image.asset(
-                  'assets/images/logo_white.png',
-                  height: 64,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Itinera',
-                  style: TextStyle(
-                    fontFamily: 'RobotoMono',
-                    fontSize: 24,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 3. Dynamic Bottom Sheet
-          Align(
-            alignment: Alignment.bottomCenter,
+          // Top Half: Animation + Logo
+          Expanded(
+            flex: 5,
             child: Container(
               width: double.infinity,
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.75,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              color:
+                  Colors.white, // Changed to white to match screen background
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  // Title
-                  const Text(
-                    'EFFORTLESS\nADAPTIVE\nPLANNING',
-                    style: TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      letterSpacing: -0.5,
+                  // Lottie Animation (Local Asset)
+                  Positioned.fill(
+                    child: Lottie.asset(
+                      'assets/images/world_map_pinging.json',
+                      // decoder: LottieComposition.decodeZip, // Removed as it's now JSON
+                      fit: BoxFit.cover,
+                      repeat: true,
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  // Logo centered on globe
+                  Image.asset(
+                    'assets/images/logo_black.png',
+                    height: 80,
+                    fit: BoxFit.contain,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Bottom Half: Content
+          Expanded(
+            flex: 4,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Step Indicator
+                  Text(
+                    'STEP 1 OF 4',
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Title
+                  const Text(
+                    'WELCOME TO\nITINERA',
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1.0,
+                      color: Colors.black,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
                   // Description
                   Text(
-                    'Itinera intelligently crafts and adjusts your journeys automatically, so you can focus on the experience.',
+                    'Your personal travel companion that learns what you love and builds the perfect trip, every time.',
                     style: TextStyle(
+                      fontFamily: 'RobotoMono',
                       fontSize: 15,
                       color: Colors.grey.shade600,
                       height: 1.5,
                     ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const Spacer(),
 
-                  // Progress dots
-                  const ProgressDots(currentIndex: 0, totalDots: 3),
-
-                  const SizedBox(height: 24),
-
-                  // Start button
-                  PrimaryButton(
-                    text: 'START PLANNING',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const Onboarding2Screen(),
+                  // Bottom Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const Onboarding2Screen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                      );
-                    },
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'CONTINUE',
+                            style: TextStyle(
+                              fontFamily: 'RobotoMono',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward, size: 20),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),

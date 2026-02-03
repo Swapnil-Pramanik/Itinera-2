@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../widgets/buttons/buttons.dart';
+
 import 'onboarding_completion_screen.dart';
 
 /// Onboarding Screen 3 - Preferences selection
@@ -19,211 +19,205 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // 1. Full Screen Background
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/onboarding_bg.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.3),
-            ),
-          ),
-
-          // 2. Fixed Logo & App Name
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 20,
-            left: 0,
-            right: 0,
-            child: Column(
-              children: [
-                Image.asset(
-                  'assets/images/logo_white.png',
-                  height: 64,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Itinera',
-                  style: TextStyle(
-                    fontFamily: 'RobotoMono',
-                    fontSize: 24,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          child: Column(
+            children: [
+              // Header with logo
+              Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 20),
+                  child: Image.asset(
+                    'assets/images/logo_black.png',
+                    height: 80,
+                    fit: BoxFit.contain,
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
 
-          // 3. Dynamic Bottom Sheet
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: double.infinity,
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.75,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              // Header Row with Back Button & Step
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      Text(
-                        'STEP 3 OF 4',
-                        style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ],
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    style: IconButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'PREFERENCES',
-                            style: TextStyle(
-                              fontFamily: 'RobotoMono',
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Tell us your travel DNA. We\'ll handle the rest.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          _buildSectionLabel('TRAVEL STYLE'),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              _buildStyleOption('RELAXED', Icons.spa_outlined,
-                                  _selectedStyle == 'RELAXED'),
-                              const SizedBox(width: 12),
-                              _buildStyleOption('BALANCED', Icons.balance,
-                                  _selectedStyle == 'BALANCED'),
-                              const SizedBox(width: 12),
-                              _buildStyleOption(
-                                  'PACKED',
-                                  Icons.flash_on_outlined,
-                                  _selectedStyle == 'PACKED'),
-                            ],
-                          ),
-                          const SizedBox(height: 28),
-                          _buildSectionLabel('DAILY PACE'),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              ChipButton(
-                                label: 'SLOW MORNINGS',
-                                isSelected: _selectedPace == 'SLOW MORNINGS',
-                                onTap: () => setState(
-                                    () => _selectedPace = 'SLOW MORNINGS'),
-                              ),
-                              ChipButton(
-                                label: 'FLEXIBLE',
-                                isSelected: _selectedPace == 'FLEXIBLE',
-                                onTap: () =>
-                                    setState(() => _selectedPace = 'FLEXIBLE'),
-                              ),
-                              ChipButton(
-                                label: 'EARLY STARTS',
-                                isSelected: _selectedPace == 'EARLY STARTS',
-                                onTap: () => setState(
-                                    () => _selectedPace = 'EARLY STARTS'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 28),
-                          _buildSectionLabel('INTERESTS'),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              _buildInterestChip(
-                                  'Food', Icons.restaurant_outlined),
-                              _buildInterestChip(
-                                  'Culture', Icons.museum_outlined),
-                              _buildInterestChip('Nature', Icons.park_outlined),
-                              _buildInterestChip(
-                                  'Shopping', Icons.shopping_bag_outlined),
-                              _buildInterestChip(
-                                  'Nightlife', Icons.nightlife_outlined),
-                              _buildInterestChip(
-                                  'Adventure', Icons.hiking_outlined),
-                            ],
-                          ),
-                          const SizedBox(height: 32),
-                          _buildSectionLabel('AUTOMATION LEVEL'),
-                          const SizedBox(height: 12),
-                          _buildAutomationOption(
-                            'PLAN EVERYTHING AUTOMATICALLY',
-                            'We build the entire schedule for you.',
-                            Icons.auto_awesome,
-                            _autoPlanning,
-                            () => setState(() => _autoPlanning = true),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildAutomationOption(
-                            'SUGGEST, I\'LL DECIDE',
-                            'Get recommendations, build it yourself.',
-                            Icons.edit_note,
-                            !_autoPlanning,
-                            () => setState(() => _autoPlanning = false),
-                          ),
-                          const SizedBox(height: 40),
-                          PrimaryButton(
-                            text: 'CONTINUE',
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const OnboardingCompletionScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                  Text(
+                    'STEP 3 OF 4',
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-            ),
+
+              // Scrollable content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 24, bottom: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'PREFERENCES',
+                        style: TextStyle(
+                          fontFamily: 'RobotoMono',
+                          fontSize: 32,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -1.0,
+                          color: Colors.black,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tell us your travel DNA. We\'ll handle the rest.',
+                        style: TextStyle(
+                          fontFamily: 'RobotoMono',
+                          fontSize: 15,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      _buildSectionLabel('TRAVEL STYLE'),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          _buildStyleOption('RELAXED', Icons.spa_outlined,
+                              _selectedStyle == 'RELAXED'),
+                          const SizedBox(width: 12),
+                          _buildStyleOption('BALANCED', Icons.balance,
+                              _selectedStyle == 'BALANCED'),
+                          const SizedBox(width: 12),
+                          _buildStyleOption('PACKED', Icons.flash_on_outlined,
+                              _selectedStyle == 'PACKED'),
+                        ],
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      _buildSectionLabel('DAILY PACE'),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildPaceChip('SLOW MORNINGS',
+                              _selectedPace == 'SLOW MORNINGS'),
+                          _buildPaceChip(
+                              'FLEXIBLE', _selectedPace == 'FLEXIBLE'),
+                          _buildPaceChip(
+                              'EARLY STARTS', _selectedPace == 'EARLY STARTS'),
+                        ],
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      _buildSectionLabel('INTERESTS'),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildInterestChip('Food', Icons.restaurant_outlined),
+                          _buildInterestChip('Culture', Icons.museum_outlined),
+                          _buildInterestChip('Nature', Icons.park_outlined),
+                          _buildInterestChip(
+                              'Shopping', Icons.shopping_bag_outlined),
+                          _buildInterestChip(
+                              'Nightlife', Icons.nightlife_outlined),
+                          _buildInterestChip(
+                              'Adventure', Icons.hiking_outlined),
+                        ],
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      _buildSectionLabel('AUTOMATION LEVEL'),
+                      const SizedBox(height: 16),
+                      _buildAutomationOption(
+                        'PLAN EVERYTHING AUTOMATICALLY',
+                        'We build the entire schedule for you.',
+                        Icons.auto_awesome,
+                        _autoPlanning,
+                        () => setState(() => _autoPlanning = true),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildAutomationOption(
+                        'SUGGEST, I\'LL DECIDE',
+                        'Get recommendations, build it yourself.',
+                        Icons.edit_note,
+                        !_autoPlanning,
+                        () => setState(() => _autoPlanning = false),
+                      ),
+
+                      const SizedBox(height: 48), // Bottom padding
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Button
+              Padding(
+                padding: const EdgeInsets.only(bottom: 24.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const OnboardingCompletionScreen(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'CONTINUE',
+                          style: TextStyle(
+                            fontFamily: 'RobotoMono',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(Icons.arrow_forward, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -233,10 +227,10 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
       label,
       style: TextStyle(
         fontFamily: 'RobotoMono',
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
         letterSpacing: 1.2,
-        color: Colors.grey.shade600,
+        color: Colors.grey.shade500,
       ),
     );
   }
@@ -246,12 +240,12 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
       child: GestureDetector(
         onTap: () => setState(() => _selectedStyle = label),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.grey.shade100 : Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            color: isSelected ? Colors.grey.shade50 : Colors.white,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isSelected ? Colors.black : Colors.grey.shade300,
+              color: isSelected ? Colors.black : Colors.grey.shade200,
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -259,20 +253,45 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
             children: [
               Icon(
                 icon,
-                size: 24,
-                color: isSelected ? Colors.black : Colors.grey.shade600,
+                size: 28,
+                color: isSelected ? Colors.black : Colors.grey.shade400,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
                 label,
                 style: TextStyle(
                   fontFamily: 'RobotoMono',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: isSelected ? Colors.black : Colors.grey.shade600,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.black : Colors.grey.shade500,
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaceChip(String label, bool isSelected) {
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPace = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isSelected ? Colors.black : Colors.grey.shade300,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'RobotoMono',
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: isSelected ? Colors.white : Colors.grey.shade700,
           ),
         ),
       ),
@@ -292,10 +311,10 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected ? Colors.black : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isSelected ? Colors.black : Colors.grey.shade300,
           ),
@@ -305,15 +324,15 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
           children: [
             Icon(
               icon,
-              size: 16,
-              color: isSelected ? Colors.white : Colors.grey.shade700,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey.shade500,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 fontFamily: 'RobotoMono',
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: isSelected ? Colors.white : Colors.grey.shade700,
               ),
@@ -334,12 +353,12 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: isSelected ? Colors.grey.shade50 : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? Colors.black : Colors.grey.shade300,
+            color: isSelected ? Colors.black : Colors.grey.shade200,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -347,8 +366,8 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
           children: [
             Icon(
               icon,
-              size: 24,
-              color: isSelected ? Colors.black : Colors.grey.shade600,
+              size: 28,
+              color: isSelected ? Colors.black : Colors.grey.shade400,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -360,29 +379,31 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
                     style: TextStyle(
                       fontFamily: 'RobotoMono',
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: isSelected ? Colors.black : Colors.grey.shade700,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     description,
                     style: TextStyle(
+                      fontFamily: 'RobotoMono',
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: Colors.grey.shade500,
+                      height: 1.4,
                     ),
                   ),
                 ],
               ),
             ),
             Container(
-              width: 20,
-              height: 20,
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? Colors.black : Colors.grey.shade400,
-                  width: isSelected ? 6 : 2,
+                  color: isSelected ? Colors.black : Colors.grey.shade300,
+                  width: isSelected ? 7 : 2,
                 ),
               ),
             ),
