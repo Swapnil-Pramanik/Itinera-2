@@ -6,7 +6,7 @@ class AppTheme {
 
   // Seed color extracted from design - dark teal/blue
   static const Color _seedColor = Color(0xFF1A1A2E);
-  
+
   // Brand colors
   static const Color primaryDark = Color(0xFF1A1A2E);
   static const Color surfaceLight = Color(0xFFF5F5F5);
@@ -29,7 +29,7 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: surfaceLight,
       fontFamily: 'RobotoMono',
-      
+
       // AppBar Theme
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -59,16 +59,19 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryDark,
           foregroundColor: Colors.white,
+          disabledBackgroundColor: const Color(0xFFEEEEEE),
+          disabledForegroundColor: const Color(0xFFBDBDBD),
           elevation: 0,
+          minimumSize: const Size(0, 56),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(30),
           ),
           textStyle: const TextStyle(
             fontFamily: 'RobotoMono',
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 1.2,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
           ),
         ),
       ),
@@ -78,15 +81,16 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: primaryDark,
           side: const BorderSide(color: primaryDark, width: 1.5),
+          minimumSize: const Size(0, 56),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(30),
           ),
           textStyle: const TextStyle(
             fontFamily: 'RobotoMono',
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 1.2,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
           ),
         ),
       ),
@@ -119,7 +123,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: primaryDark, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         hintStyle: TextStyle(
           fontFamily: 'RobotoMono',
           color: Colors.grey.shade500,

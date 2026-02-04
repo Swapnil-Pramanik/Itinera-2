@@ -1,9 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
 import 'onboarding_completion_screen.dart';
+import '../../widgets/blur_page_route.dart';
 
-/// Onboarding Screen 3 - Preferences selection
+/// Onboarding Screen 3 - Preferences selection with multi-step wizard
 class Onboarding3Screen extends StatefulWidget {
   const Onboarding3Screen({super.key});
 
@@ -11,11 +13,167 @@ class Onboarding3Screen extends StatefulWidget {
   State<Onboarding3Screen> createState() => _Onboarding3ScreenState();
 }
 
-class _Onboarding3ScreenState extends State<Onboarding3Screen> {
+class _Onboarding3ScreenState extends State<Onboarding3Screen>
+    with SingleTickerProviderStateMixin {
+  // Current step (0-3)
+  int _currentStep = 0;
+
+  // Selection state
   String _selectedStyle = 'BALANCED';
   String _selectedPace = 'FLEXIBLE';
   Set<String> _selectedInterests = {'Food', 'Culture'};
   bool _autoPlanning = true;
+
+  // Animation controller for blur transition
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _blurAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    _blurAnimation = Tween<double>(begin: 0.0, end: 8.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleContinue() async {
+    if (_currentStep < 3) {
+      // Animate out
+      await _animationController.forward();
+
+      // Change step
+      setState(() {
+        _currentStep++;
+      });
+
+      // Animate in
+      await _animationController.reverse();
+    } else {
+      // Final step - navigate to completion
+      Navigator.push(
+        context,
+        BlurPageRoute(
+          page: const OnboardingCompletionScreen(),
+        ),
+      );
+    }
+  }
+
+  String _getStepTitle() {
+    switch (_currentStep) {
+      case 0:
+        return 'TRAVEL STYLE';
+      case 1:
+        return 'DAILY PACE';
+      case 2:
+        return 'INTERESTS';
+      case 3:
+        return 'AUTOMATION LEVEL';
+      default:
+        return 'PREFERENCES';
+    }
+  }
+
+  Widget _buildStepContent() {
+    switch (_currentStep) {
+      case 0:
+        return _buildTravelStyle();
+      case 1:
+        return _buildDailyPace();
+      case 2:
+        return _buildInterests();
+      case 3:
+        return _buildAutomationLevel();
+      default:
+        return const SizedBox();
+    }
+  }
+
+  Widget _buildTravelStyle() {
+    return Row(
+      children: [
+        _buildStyleOption(
+            'RELAXED', Icons.spa_outlined, _selectedStyle == 'RELAXED'),
+        const SizedBox(width: 12),
+        _buildStyleOption(
+            'BALANCED', Icons.balance, _selectedStyle == 'BALANCED'),
+        const SizedBox(width: 12),
+        _buildStyleOption(
+            'PACKED', Icons.flash_on_outlined, _selectedStyle == 'PACKED'),
+      ],
+    );
+  }
+
+  Widget _buildDailyPace() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        _buildPaceChip('SLOW MORNINGS', _selectedPace == 'SLOW MORNINGS'),
+        _buildPaceChip('FLEXIBLE', _selectedPace == 'FLEXIBLE'),
+        _buildPaceChip('EARLY STARTS', _selectedPace == 'EARLY STARTS'),
+      ],
+    );
+  }
+
+  Widget _buildInterests() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        _buildInterestChip('Food', Icons.restaurant_outlined),
+        _buildInterestChip('Culture', Icons.museum_outlined),
+        _buildInterestChip('Nature', Icons.park_outlined),
+        _buildInterestChip('Shopping', Icons.shopping_bag_outlined),
+        _buildInterestChip('Nightlife', Icons.nightlife_outlined),
+        _buildInterestChip('Adventure', Icons.hiking_outlined),
+      ],
+    );
+  }
+
+  Widget _buildAutomationLevel() {
+    return Column(
+      children: [
+        _buildAutomationOption(
+          'PLAN EVERYTHING AUTOMATICALLY',
+          'We build the entire schedule for you.',
+          Icons.auto_awesome,
+          _autoPlanning,
+          () => setState(() => _autoPlanning = true),
+        ),
+        const SizedBox(height: 12),
+        _buildAutomationOption(
+          'SUGGEST, I\'LL DECIDE',
+          'Get recommendations, build it yourself.',
+          Icons.edit_note,
+          !_autoPlanning,
+          () => setState(() => _autoPlanning = false),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,11 +212,11 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
 
               // Animation
               Padding(
-                padding: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Center(
                   child: Lottie.asset(
                     'assets/planning_route.json',
-                    height: 250,
+                    height: 360,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) {
                       return const Center(
@@ -84,109 +242,70 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
                 ),
               ),
 
-              // Scrollable content
+              // Static Preferences heading
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PREFERENCES',
+                      style: TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 32,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -1.0,
+                        color: Colors.black,
+                        height: 1.1,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Tell us your travel DNA. We\'ll handle the rest.',
+                      style: TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 15,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Step content with blur transition
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(top: 24, bottom: 24),
+                child: AnimatedBuilder(
+                  animation: _animationController,
+                  builder: (context, child) {
+                    return ImageFiltered(
+                      imageFilter: ImageFilter.blur(
+                        sigmaX: _blurAnimation.value,
+                        sigmaY: _blurAnimation.value,
+                      ),
+                      child: Opacity(
+                        opacity: _fadeAnimation.value,
+                        child: child,
+                      ),
+                    );
+                  },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        'PREFERENCES',
-                        style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -1.0,
-                          color: Colors.black,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
                       Text(
-                        'Tell us your travel DNA. We\'ll handle the rest.',
+                        _getStepTitle(),
                         style: TextStyle(
                           fontFamily: 'RobotoMono',
-                          fontSize: 15,
-                          color: Colors.grey.shade600,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: Colors.grey.shade500,
                         ),
                       ),
-
-                      const SizedBox(height: 32),
-
-                      _buildSectionLabel('TRAVEL STYLE'),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _buildStyleOption('RELAXED', Icons.spa_outlined,
-                              _selectedStyle == 'RELAXED'),
-                          const SizedBox(width: 12),
-                          _buildStyleOption('BALANCED', Icons.balance,
-                              _selectedStyle == 'BALANCED'),
-                          const SizedBox(width: 12),
-                          _buildStyleOption('PACKED', Icons.flash_on_outlined,
-                              _selectedStyle == 'PACKED'),
-                        ],
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      _buildSectionLabel('DAILY PACE'),
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _buildPaceChip('SLOW MORNINGS',
-                              _selectedPace == 'SLOW MORNINGS'),
-                          _buildPaceChip(
-                              'FLEXIBLE', _selectedPace == 'FLEXIBLE'),
-                          _buildPaceChip(
-                              'EARLY STARTS', _selectedPace == 'EARLY STARTS'),
-                        ],
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      _buildSectionLabel('INTERESTS'),
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _buildInterestChip('Food', Icons.restaurant_outlined),
-                          _buildInterestChip('Culture', Icons.museum_outlined),
-                          _buildInterestChip('Nature', Icons.park_outlined),
-                          _buildInterestChip(
-                              'Shopping', Icons.shopping_bag_outlined),
-                          _buildInterestChip(
-                              'Nightlife', Icons.nightlife_outlined),
-                          _buildInterestChip(
-                              'Adventure', Icons.hiking_outlined),
-                        ],
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      _buildSectionLabel('AUTOMATION LEVEL'),
-                      const SizedBox(height: 16),
-                      _buildAutomationOption(
-                        'PLAN EVERYTHING AUTOMATICALLY',
-                        'We build the entire schedule for you.',
-                        Icons.auto_awesome,
-                        _autoPlanning,
-                        () => setState(() => _autoPlanning = true),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildAutomationOption(
-                        'SUGGEST, I\'LL DECIDE',
-                        'Get recommendations, build it yourself.',
-                        Icons.edit_note,
-                        !_autoPlanning,
-                        () => setState(() => _autoPlanning = false),
-                      ),
-
-                      const SizedBox(height: 48), // Bottom padding
+                      _buildStepContent(),
                     ],
                   ),
                 ),
@@ -199,37 +318,21 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const OnboardingCompletionScreen(),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: const Row(
+                    onPressed: _handleContinue,
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'CONTINUE',
-                          style: TextStyle(
+                          _currentStep < 3 ? 'NEXT' : 'CONTINUE',
+                          style: const TextStyle(
                             fontFamily: 'RobotoMono',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.5,
                           ),
                         ),
-                        SizedBox(width: 8),
-                        Icon(Icons.arrow_forward, size: 20),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward, size: 20),
                       ],
                     ),
                   ),
@@ -238,19 +341,6 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionLabel(String label) {
-    return Text(
-      label,
-      style: TextStyle(
-        fontFamily: 'RobotoMono',
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 1.2,
-        color: Colors.grey.shade500,
       ),
     );
   }

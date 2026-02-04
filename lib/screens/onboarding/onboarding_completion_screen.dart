@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import '../home/home_screen.dart';
+import '../../widgets/blur_page_route.dart';
 
 /// Onboarding Completion Screen - Loading state before home
 class OnboardingCompletionScreen extends StatefulWidget {
@@ -37,31 +39,26 @@ class _OnboardingCompletionScreenState
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
-          child: Column(
-            children: [
-              // Header with logo
-              Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 20, bottom: 40),
-                  child: Image.asset(
-                    'assets/images/logo_black.png',
-                    height: 80,
-                    fit: BoxFit.contain,
+        child: Column(
+          children: [
+            // Expanded Content
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Animation - Full Width
+                  Lottie.asset(
+                    'assets/onboarding_completion.json',
+                    width: double.infinity,
+                    fit: BoxFit.fitWidth,
                   ),
-                ),
-              ),
+                  const SizedBox(height: 40),
 
-              // Expanded Content
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title
-                    const Text(
+                  // Title
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Text(
                       'PREPARING YOUR\nEXPERIENCE',
                       style: TextStyle(
                         fontFamily: 'RobotoMono',
@@ -72,27 +69,36 @@ class _OnboardingCompletionScreenState
                         color: Colors.black,
                       ),
                     ),
+                  ),
 
-                    const SizedBox(height: 40),
+                  const SizedBox(height: 40),
 
-                    // Loading status items
-                    _buildStatusItem(
-                      text: 'CHECKING WEATHER...',
-                      isComplete: _step1Complete,
-                      isLoading: !_step1Complete,
+                  // Loading status items
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Column(
+                      children: [
+                        _buildStatusItem(
+                          text: 'LOADING YOUR ATLAS...',
+                          isComplete: _step1Complete,
+                          isLoading: !_step1Complete,
+                        ),
+                        _buildStatusItem(
+                          text: 'CURATING RECOMMENDATIONS...',
+                          isComplete: _step2Complete,
+                          isLoading: _step1Complete && !_step2Complete,
+                        ),
+                      ],
                     ),
-
-                    _buildStatusItem(
-                      text: 'OPTIMIZING ROUTES...',
-                      isComplete: _step2Complete,
-                      isLoading: _step1Complete && !_step2Complete,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
 
-              // Start Exploring button - pill shaped
-              SizedBox(
+            // Start Exploring button - pill shaped
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
@@ -100,23 +106,13 @@ class _OnboardingCompletionScreenState
                       ? () {
                           Navigator.pushAndRemoveUntil(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => const HomeScreen(),
+                            BlurPageRoute(
+                              page: const HomeScreen(),
                             ),
                             (route) => false,
                           );
                         }
                       : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade200,
-                    disabledForegroundColor: Colors.grey.shade400,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -135,9 +131,8 @@ class _OnboardingCompletionScreenState
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -28,7 +28,8 @@ class TripCurrentScreen extends StatelessWidget {
         actions: [
           Row(
             children: [
-              Icon(Icons.wb_sunny_outlined, size: 16, color: Colors.grey.shade600),
+              Icon(Icons.wb_sunny_outlined,
+                  size: 16, color: Colors.grey.shade600),
               const SizedBox(width: 4),
               Text(
                 '22°C',
@@ -72,9 +73,9 @@ class TripCurrentScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // Today • Day 3
                   const Text(
                     'Today • Day 3',
@@ -84,9 +85,9 @@ class TripCurrentScreen extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Current activity indicator
                   Row(
                     children: [
@@ -110,7 +111,8 @@ class TripCurrentScreen extends StatelessWidget {
                       ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(12),
@@ -128,9 +130,9 @@ class TripCurrentScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Map with current location
             Container(
               height: 200,
@@ -151,7 +153,8 @@ class TripCurrentScreen extends StatelessWidget {
                     left: 16,
                     bottom: 50,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
@@ -188,9 +191,9 @@ class TripCurrentScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Action buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -201,9 +204,6 @@ class TripCurrentScreen extends StatelessWidget {
                       onPressed: () {},
                       icon: const Icon(Icons.navigation_outlined, size: 18),
                       label: const Text('NAVIGATE'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -212,17 +212,14 @@ class TripCurrentScreen extends StatelessWidget {
                       onPressed: () {},
                       icon: const Icon(Icons.check, size: 18),
                       label: const Text('MARK DONE'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 28),
-            
+
             // Coming up section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -237,24 +234,24 @@ class TripCurrentScreen extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // Upcoming activities
             _buildUpcomingActivity(
               'RYOAN-JI',
               'Zen rock garden',
               '11:30',
             ),
-            
+
             _buildUpcomingActivity(
               'NISHIKI MARKET',
               'Kyoto\'s Kitchen',
               '13:00',
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Quick actions
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -268,9 +265,9 @@ class TripCurrentScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // AI input bar
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
@@ -278,7 +275,7 @@ class TripCurrentScreen extends StatelessWidget {
                 hintText: 'ASK ITINERA...',
               ),
             ),
-            
+
             const SizedBox(height: 40),
           ],
         ),
