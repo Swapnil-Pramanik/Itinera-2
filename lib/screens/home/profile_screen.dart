@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/buttons/buttons.dart';
+import '../auth/login_signup_screen.dart';
+import '../../widgets/blur_page_route.dart';
 
 /// Profile Screen - User profile with settings
 class ProfileScreen extends StatelessWidget {
@@ -72,9 +74,9 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Name
             const Text(
               'ALEX',
@@ -85,9 +87,9 @@ class ProfileScreen extends StatelessWidget {
                 letterSpacing: 2,
               ),
             ),
-            
+
             const SizedBox(height: 4),
-            
+
             Text(
               'EXPLORER LEVEL 4',
               style: TextStyle(
@@ -97,9 +99,9 @@ class ProfileScreen extends StatelessWidget {
                 letterSpacing: 1,
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // Settings sections
             _buildSettingsItem(
               icon: Icons.person_outline,
@@ -107,7 +109,7 @@ class ProfileScreen extends StatelessWidget {
               subtitle: 'Name, email, and phone',
               onTap: () {},
             ),
-            
+
             _buildSettingsItem(
               icon: Icons.tune,
               title: 'TRAVEL PREFERENCES',
@@ -124,23 +126,23 @@ class ProfileScreen extends StatelessWidget {
               ),
               onTap: () {},
             ),
-            
+
             _buildSettingsItem(
               icon: Icons.notifications_outlined,
               title: 'NOTIFICATION SETTINGS',
               subtitle: 'Alerts & travel updates',
               onTap: () {},
             ),
-            
+
             _buildSettingsItem(
               icon: Icons.lock_outline,
               title: 'PRIVACY & SECURITY',
               subtitle: 'Passkeys & data control',
               onTap: () {},
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Linked accounts
             Container(
               width: double.infinity,
@@ -155,7 +157,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             _buildLinkedAccount(
               icon: 'G',
               iconColor: Colors.red,
@@ -163,7 +165,7 @@ class ProfileScreen extends StatelessWidget {
               status: 'CONNECTED',
               isConnected: true,
             ),
-            
+
             _buildLinkedAccount(
               icon: '',
               iconWidget: const Icon(Icons.apple, size: 20),
@@ -171,20 +173,24 @@ class ProfileScreen extends StatelessWidget {
               status: 'LINK ACCOUNT',
               isConnected: false,
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // Buttons
             const PrimaryButton(
               text: 'SAVE CHANGES',
               showArrow: false,
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             TextButton(
               onPressed: () {
-                Navigator.popUntil(context, (route) => route.isFirst);
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  BlurPageRoute(page: const LoginSignupScreen()),
+                  (route) => false,
+                );
               },
               child: const Text(
                 'LOG OUT',
@@ -197,9 +203,9 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Version
             Text(
               'ITINERA V1.4.0',

@@ -73,6 +73,7 @@ graph TD
 
     %% Home Screen Interactions
     Home -- Profile Icon --> Profile[ProfileScreen]
+    Profile -- Logout --> Auth
     Home -- FAB --> Search[SearchBottomSheet]
 
     %% Trip Management
