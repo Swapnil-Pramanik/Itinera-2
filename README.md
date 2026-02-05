@@ -96,6 +96,54 @@ graph TD
     Budget -- Done --> Home
 ```
 
+## Database Schema
+
+The PostgreSQL schema is located in `db/itinera_schema.sql`. See `db/SCHEMA.md` for detailed documentation.
+
+### Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    users ||--o{ trips : creates
+    users ||--o{ user_preferences : has
+    users ||--o{ linked_accounts : connects
+    users ||--o{ search_history : searches
+    
+    destinations ||--o{ attractions : contains
+    destinations ||--o{ atlas_articles : featured_in
+    destinations ||--o{ trips : visited_in
+    
+    trips ||--o{ timeline_days : has
+    trips ||--|| budgets : has
+    trips ||--o{ checklist_items : requires
+    
+    timeline_days ||--o{ activities : includes
+    timeline_days ||--o{ budget_days : has_budget
+    
+    budgets ||--o{ budget_days : breakdown
+    budgets ||--o{ budget_tips : suggests
+    
+    budget_days ||--o{ expense_items : contains
+```
+
+### Tables (17 total)
+
+| Category | Tables |
+|----------|--------|
+| **Auth** | `users`, `user_preferences`, `linked_accounts` |
+| **Content** | `destinations`, `attractions`, `atlas_articles` |
+| **Trips** | `trips`, `timeline_days`, `activities` |
+| **Budget** | `budgets`, `budget_days`, `expense_items`, `budget_tips` |
+| **Checklist** | `checklist_templates`, `checklist_items` |
+| **Discovery** | `search_history`, `suggested_destinations` |
+
+### Initialize Database
+
+```bash
+createdb itinera
+psql -U postgres -d itinera -f db/itinera_schema.sql
+```
+
 ## Assets
 - Design references: `assets/images/stitch_itinera/`
 - App logos: `assets/images/logo_black.png`, `assets/images/logo_white.png`
