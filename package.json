@@ -1,0 +1,25 @@
+{
+  "name": "itinera-2",
+  "version": "1.0.0",
+  "description": "Itinera is a Flutter UI prototype for an intelligent travel-planning experience. It focuses on onboarding, itinerary generation, timeline editing, and budget estimation with a consistent Material 3 design system and custom typography.",
+  "main": "convert_to_pdf.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Swapnil-Pramanik/Itinera-2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Swapnil-Pramanik/Itinera-2/issues"
+  },
+  "homepage": "https://github.com/Swapnil-Pramanik/Itinera-2#readme"
+}
