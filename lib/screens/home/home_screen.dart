@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/user_service.dart';
 import '../../widgets/appbars/appbars.dart';
 import '../../widgets/cards/cards.dart';
 import '../../widgets/common/common.dart';
@@ -34,7 +35,7 @@ class HomeScreen extends StatelessWidget {
 
             // Greeting
             Text(
-              'Good Morning,',
+              UserService.getGreeting(),
               style: TextStyle(
                 fontFamily: 'RobotoMono',
                 fontSize: 28,
@@ -42,9 +43,9 @@ class HomeScreen extends StatelessWidget {
                 color: Colors.grey.shade800,
               ),
             ),
-            const Text(
-              'Alex',
-              style: TextStyle(
+            Text(
+              UserService.getDisplayName(),
+              style: const TextStyle(
                 fontFamily: 'RobotoMono',
                 fontSize: 32,
                 fontWeight: FontWeight.w600,

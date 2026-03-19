@@ -7,7 +7,7 @@ from core.supabase import get_supabase
 router = APIRouter(prefix="/users", tags=["users"])
 
 class UserProfileUpdate(BaseModel):
-    full_name: Optional[str] = None
+    display_name: Optional[str] = None
     avatar_url: Optional[str] = None
 
 @router.get("/me")
@@ -32,8 +32,8 @@ def create_or_update_user_profile(profile: UserProfileUpdate, user_payload: dict
     
     # Upsert the user profile
     data = {"id": user_id, "email": email}
-    if profile.full_name is not None:
-        data["full_name"] = profile.full_name
+    if profile.display_name is not None:
+        data["display_name"] = profile.display_name
     if profile.avatar_url is not None:
         data["avatar_url"] = profile.avatar_url
         

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/user_service.dart';
 import '../../widgets/buttons/buttons.dart';
 import '../auth/login_signup_screen.dart';
 import '../../widgets/blur_page_route.dart';
@@ -78,9 +80,9 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Name
-            const Text(
-              'ALEX',
-              style: TextStyle(
+            Text(
+              UserService.getDisplayName().toUpperCase(),
+              style: const TextStyle(
                 fontFamily: 'RobotoMono',
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
@@ -185,12 +187,15 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
 
             TextButton(
-              onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  BlurPageRoute(page: const LoginSignupScreen()),
-                  (route) => false,
-                );
+              onPressed: () async {
+                await Supabase.instance.client.auth.signOut();
+                if (context.mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    BlurPageRoute(page: const LoginSignupScreen()),
+                    (route) => false,
+                  );
+                }
               },
               child: const Text(
                 'LOG OUT',

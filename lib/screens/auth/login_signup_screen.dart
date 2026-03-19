@@ -20,6 +20,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
   bool _obscurePassword = true;
   bool _isLoading = false;
 
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -59,6 +60,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
   @override
   void dispose() {
     _animationController.dispose();
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -80,12 +82,20 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
   }
 
   Future<void> _submitAuth() async {
+    final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter both email and password.')),
+      );
+      return;
+    }
+
+    if (!_isLogin && name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your name.')),
       );
       return;
     }
@@ -105,7 +115,11 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
           );
         }
       } else {
-        await supabase.auth.signUp(email: email, password: password);
+        await supabase.auth.signUp(
+          email: email,
+          password: password,
+          data: {'display_name': name},
+        );
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -333,6 +347,17 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
                       },
                       child: Column(
                         children: [
+                          // Name field (only for Sign Up)
+                          if (!_isLogin) ...[
+                            _buildInputField(
+                              label: 'Full Name',
+                              hintText: '',
+                              prefixIcon: Icons.person_outline,
+                              controller: _nameController,
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+
                           // Inputs
                           _buildInputField(
                             label: 'Email Address',
