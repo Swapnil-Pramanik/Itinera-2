@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../onboarding/onboarding_1_screen.dart';
 import '../home/home_screen.dart';
@@ -17,6 +18,10 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
     with SingleTickerProviderStateMixin {
   int _selectedTabIndex = 0; // 0 = Log In, 1 = Sign Up
   bool _obscurePassword = true;
+  bool _isLoading = false;
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   // Animation controller for blur transition
   late AnimationController _animationController;
@@ -54,6 +59,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
   @override
   void dispose() {
     _animationController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -70,6 +77,61 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
 
     // Animate in
     await _animationController.reverse();
+  }
+
+  Future<void> _submitAuth() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter both email and password.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+      if (_isLogin) {
+        await supabase.auth.signInWithPassword(email: email, password: password);
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            BlurPageRoute(page: const HomeScreen()),
+          );
+        }
+      } else {
+        await supabase.auth.signUp(email: email, password: password);
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            BlurPageRoute(page: const Onboarding1Screen()),
+          );
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('An unexpected error occurred.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -276,6 +338,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
                             label: 'Email Address',
                             hintText: '',
                             prefixIcon: Icons.mail_outline,
+                            controller: _emailController,
                           ),
 
                           const SizedBox(height: 20),
@@ -294,6 +357,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
                               ),
                               const SizedBox(height: 8),
                               TextField(
+                                controller: _passwordController,
                                 obscureText: _obscurePassword,
                                 style: const TextStyle(
                                   fontFamily: 'RobotoMono',
@@ -356,26 +420,16 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
 
                           const SizedBox(height: 32),
 
-                          // Main Action Button
                           SizedBox(
                             width: double.infinity,
                             height: 56,
                             child: ElevatedButton(
-                              onPressed: () {
-                                if (_isLogin) {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    BlurPageRoute(page: const HomeScreen()),
-                                  );
-                                } else {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    BlurPageRoute(
-                                        page: const Onboarding1Screen()),
-                                  );
-                                }
-                              },
-                              child: Row(
+                              onPressed: _isLoading ? null : _submitAuth,
+                              child: _isLoading ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              ) : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
@@ -409,6 +463,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
     required String label,
     required String hintText,
     required IconData prefixIcon,
+    TextEditingController? controller,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,6 +479,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
         ),
         const SizedBox(height: 8),
         TextField(
+          controller: controller,
           style: const TextStyle(
             fontFamily: 'RobotoMono',
             fontSize: 15,
