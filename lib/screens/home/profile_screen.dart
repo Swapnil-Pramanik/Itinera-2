@@ -1,16 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/user_service.dart';
-import '../../widgets/buttons/buttons.dart';
+import '../../core/profile_service.dart';
 import '../auth/login_signup_screen.dart';
 import '../../widgets/blur_page_route.dart';
+import 'edit_profile_screen.dart';
 
-/// Profile Screen - User profile with settings
-class ProfileScreen extends StatelessWidget {
+/// Profile Screen - User profile displaying actual database stats
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Map<String, dynamic>? _profileData;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final data = await ProfileService.getMyProfile();
+    if (mounted) {
+      setState(() {
+        _profileData = data;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.black),
+        ),
+      );
+    }
+
+    final displayName = _profileData?['display_name'] ?? UserService.getDisplayName();
+    final email = _profileData?['email'] ?? UserService.getEmail();
+    final level = _profileData?['explorer_level'] ?? 1;
+    final tripsCompleted = _profileData?['total_trips_completed'] ?? 0;
+    final placesVisited = _profileData?['total_places_visited'] ?? 0;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -30,12 +70,6 @@ class ProfileScreen extends StatelessWidget {
             color: Colors.black,
           ),
         ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.settings_outlined, color: Colors.black),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -57,23 +91,6 @@ class ProfileScreen extends StatelessWidget {
                     color: Colors.grey,
                   ),
                 ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_outlined,
-                      size: 16,
-                      color: Colors.black54,
-                    ),
-                  ),
-                ),
               ],
             ),
 
@@ -81,7 +98,7 @@ class ProfileScreen extends StatelessWidget {
 
             // Name
             Text(
-              UserService.getDisplayName().toUpperCase(),
+              displayName.toUpperCase(),
               style: const TextStyle(
                 fontFamily: 'RobotoMono',
                 fontSize: 20,
@@ -92,8 +109,9 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 4),
 
+            // Explorer Level (from DB)
             Text(
-              'EXPLORER LEVEL 4',
+              'EXPLORER LEVEL $level',
               style: TextStyle(
                 fontFamily: 'RobotoMono',
                 fontSize: 12,
@@ -104,88 +122,56 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 32),
 
-            // Settings sections
+            // Real Stats from the database
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildStatColumn('TRIPS', tripsCompleted.toString()),
+                Container(
+                  height: 40,
+                  width: 1,
+                  color: Colors.grey.shade300,
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                ),
+                _buildStatColumn('PLACES', placesVisited.toString()),
+              ],
+            ),
+
+            const SizedBox(height: 32),
+
+            // Settings sections backed by DB
             _buildSettingsItem(
               icon: Icons.person_outline,
               title: 'PERSONAL INFORMATION',
-              subtitle: 'Name, email, and phone',
-              onTap: () {},
+              subtitle: email, // Showing actual email
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditProfileScreen(
+                      initialName: displayName,
+                      email: email,
+                    ),
+                  ),
+                );
+                // If user saved changes, reload profile
+                if (result == true) {
+                  setState(() => _isLoading = true);
+                  _loadProfile();
+                }
+              },
             ),
 
             _buildSettingsItem(
               icon: Icons.tune,
               title: 'TRAVEL PREFERENCES',
-              subtitle: 'Tailor your automation',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildMiniChip('URBAN'),
-                  const SizedBox(width: 4),
-                  _buildMiniChip('FOOD'),
-                  const SizedBox(width: 4),
-                  _buildMiniChip('+3 MORE'),
-                ],
-              ),
+              subtitle: 'No preferences set', // Pending implementation hooked to user_preferences table
               onTap: () {},
             ),
 
-            _buildSettingsItem(
-              icon: Icons.notifications_outlined,
-              title: 'NOTIFICATION SETTINGS',
-              subtitle: 'Alerts & travel updates',
-              onTap: () {},
-            ),
-
-            _buildSettingsItem(
-              icon: Icons.lock_outline,
-              title: 'PRIVACY & SECURITY',
-              subtitle: 'Passkeys & data control',
-              onTap: () {},
-            ),
-
-            const SizedBox(height: 24),
-
-            // Linked accounts
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'LINKED ACCOUNTS',
-                style: TextStyle(
-                  fontFamily: 'RobotoMono',
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-
-            _buildLinkedAccount(
-              icon: 'G',
-              iconColor: Colors.red,
-              name: 'GOOGLE',
-              status: 'CONNECTED',
-              isConnected: true,
-            ),
-
-            _buildLinkedAccount(
-              icon: '',
-              iconWidget: const Icon(Icons.apple, size: 20),
-              name: 'APPLE',
-              status: 'LINK ACCOUNT',
-              isConnected: false,
-            ),
-
-            const SizedBox(height: 32),
+            const SizedBox(height: 48),
 
             // Buttons
-            const PrimaryButton(
-              text: 'SAVE CHANGES',
-              showArrow: false,
-            ),
-
-            const SizedBox(height: 12),
-
             TextButton(
               onPressed: () async {
                 await Supabase.instance.client.auth.signOut();
@@ -227,11 +213,35 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildStatColumn(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontFamily: 'RobotoMono',
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'RobotoMono',
+            fontSize: 10,
+            color: Colors.grey.shade500,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSettingsItem({
     required IconData icon,
     required String title,
     required String subtitle,
-    Widget? trailing,
     VoidCallback? onTap,
   }) {
     return InkWell(
@@ -261,16 +271,13 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  if (trailing != null)
-                    trailing
-                  else
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
                     ),
+                  ),
                 ],
               ),
             ),
@@ -280,77 +287,6 @@ class ProfileScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildMiniChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: 'RobotoMono',
-          fontSize: 9,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLinkedAccount({
-    String? icon,
-    Widget? iconWidget,
-    Color? iconColor,
-    required String name,
-    required String status,
-    required bool isConnected,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade200),
-        ),
-      ),
-      child: Row(
-        children: [
-          if (iconWidget != null)
-            iconWidget
-          else
-            Text(
-              icon ?? '',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: iconColor,
-              ),
-            ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              name,
-              style: const TextStyle(
-                fontFamily: 'RobotoMono',
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Text(
-            status,
-            style: TextStyle(
-              fontFamily: 'RobotoMono',
-              fontSize: 11,
-              color: isConnected ? Colors.green : Colors.grey.shade600,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -127,14 +127,13 @@ class SearchBottomSheet extends StatelessWidget {
                 
                 const SizedBox(height: 12),
                 
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _buildRecentChip('Tokyo'),
-                    _buildRecentChip('Swiss Alps'),
-                    _buildRecentChip('Lisbon'),
-                  ],
+                Text(
+                  'No recent searches',
+                  style: TextStyle(
+                    fontFamily: 'RobotoMono',
+                    fontSize: 13,
+                    color: Colors.grey.shade400,
+                  ),
                 ),
               ],
             ),
@@ -204,24 +203,6 @@ class SearchBottomSheet extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: 'RobotoMono',
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
         ),
       ),
     );

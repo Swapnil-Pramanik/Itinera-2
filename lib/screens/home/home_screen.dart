@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/user_service.dart';
+import '../../core/trip_service.dart';
 import '../../widgets/appbars/appbars.dart';
 import '../../widgets/cards/cards.dart';
 import '../../widgets/common/common.dart';
@@ -10,15 +11,47 @@ import '../trip/destination_detail_screen.dart';
 import '../trip/trip_scheduled_screen.dart';
 
 /// Home Screen - Main dashboard with trips and atlas
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<Map<String, dynamic>> _trips = [];
+  bool _isLoadingTrips = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrips();
+  }
+
+  Future<void> _loadTrips() async {
+    try {
+      final trips = await TripService.getMyTrips();
+      if (mounted) {
+        setState(() {
+          _trips = trips;
+          _isLoadingTrips = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingTrips = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: HomeAppBar(
-        temperature: '22°C',
+        temperature: '--',
         onMenuTap: () {
           Navigator.push(
             context,
@@ -57,55 +90,14 @@ class HomeScreen extends StatelessWidget {
             // My Planned Trips section
             SectionHeader(
               title: 'MY PLANNED TRIPS',
-              actionText: 'View all',
-              onActionTap: () {},
+              actionText: _trips.isNotEmpty ? 'View all' : null,
+              onActionTap: _trips.isNotEmpty ? () {} : null,
             ),
 
             const SizedBox(height: 16),
 
-            // Horizontal scrolling trip cards
-            SizedBox(
-              height: 150,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  TripCard(
-                    destination: 'Tokyo',
-                    country: 'Japan',
-                    tags: const ['URBAN', 'FOOD'],
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TripScheduledScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  TripCard(
-                    destination: 'Paris',
-                    country: 'France',
-                    tags: const ['CULTURE', 'ART'],
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TripScheduledScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  TripCard(
-                    destination: 'Bali',
-                    country: 'Indonesia',
-                    tags: const ['NATURE', 'RELAX'],
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ),
+            // Dynamic trip cards or empty state
+            _buildTripsSection(),
 
             const SizedBox(height: 32),
 
@@ -217,6 +209,112 @@ class HomeScreen extends StatelessWidget {
         },
         backgroundColor: Colors.black,
         child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  /// Builds the trips section — loading, empty state, or dynamic trip cards.
+  Widget _buildTripsSection() {
+    if (_isLoadingTrips) {
+      return SizedBox(
+        height: 150,
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.grey.shade400,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_trips.isEmpty) {
+      return _buildEmptyTripsState();
+    }
+
+    // Dynamic trip cards from fetched data
+    return SizedBox(
+      height: 150,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _trips.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        itemBuilder: (context, index) {
+          final trip = _trips[index];
+          final destination = trip['destinations'] as Map<String, dynamic>?;
+          final name = destination?['name'] ?? trip['title'] ?? 'Trip';
+          final country = destination?['country'] ?? '';
+          final tags = (destination?['tags'] as List<dynamic>?)
+                  ?.map((t) => t.toString())
+                  .toList() ??
+              (trip['tags'] as List<dynamic>?)
+                  ?.map((t) => t.toString())
+                  .toList() ??
+              [];
+
+          return TripCard(
+            destination: name,
+            country: country,
+            tags: tags,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TripScheduledScreen(),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  /// Empty state shown when the user has no planned trips.
+  Widget _buildEmptyTripsState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.explore_outlined,
+            size: 40,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'NO TRIPS PLANNED YET',
+            style: TextStyle(
+              fontFamily: 'RobotoMono',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tap + to explore destinations\nand plan your first adventure.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade500,
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
