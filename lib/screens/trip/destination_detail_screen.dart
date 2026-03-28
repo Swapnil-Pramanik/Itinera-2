@@ -176,7 +176,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: CustomScrollView(
+      body: Stack(
+        children: [
+          CustomScrollView(
         controller: _scrollController,
         slivers: [
           // Hero image app bar
@@ -496,6 +498,32 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
                   const SizedBox(height: 70),
                 ],
+              ),
+            ),
+          ),
+        ],
+      ),
+          // Progressive fade at the bottom matching the top gradient
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 60,
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.1),
+                      Colors.black.withOpacity(0.7),
+                      Colors.black,
+                    ],
+                    stops: const [0.0, 0.5, 0.85, 1.0],
+                  ),
+                ),
               ),
             ),
           ),

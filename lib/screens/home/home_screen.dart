@@ -7,7 +7,9 @@ import '../../widgets/cards/cards.dart';
 import '../../widgets/common/common.dart';
 import 'profile_screen.dart';
 import 'search_bottom_sheet.dart';
+import 'my_atlas_bottom_sheet.dart';
 import '../trip/destination_detail_screen.dart';
+
 import '../trip/trip_scheduled_screen.dart';
 
 /// Home Screen - Main dashboard with trips and atlas
@@ -20,15 +22,23 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _trips = [];
-  List<Map<String, dynamic>> _atlasArticles = [];
+  List<Map<String, dynamic>> _recentDestinations = [];
   bool _isLoadingTrips = true;
   bool _isLoadingAtlas = true;
+
+  final PageController _pageController = PageController(viewportFraction: 0.85);
 
   @override
   void initState() {
     super.initState();
     _loadTrips();
     _loadAtlasArticles();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTrips() async {
@@ -51,10 +61,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadAtlasArticles() async {
     try {
-      final articles = await DestinationService.getAtlasArticles();
+      final destinations = await DestinationService.getRecentDestinations();
       if (mounted) {
         setState(() {
-          _atlasArticles = articles;
+          _recentDestinations = destinations;
           _isLoadingAtlas = false;
         });
       }
@@ -123,19 +133,22 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 32),
 
             // The Atlas section
-            const SectionHeader(title: 'THE ATLAS'),
+            const SectionHeader(title: 'MY ATLAS'),
 
             const SizedBox(height: 16),
 
             // Atlas content
             _buildAtlasSection(),
 
-            const SizedBox(height: 100),
+            const SizedBox(height: 20),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Transform.translate(
+        offset: const Offset(0, 16),
+        child: FloatingActionButton.extended(
+          onPressed: () {
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
@@ -144,7 +157,24 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
         backgroundColor: Colors.black,
-        child: const Icon(Icons.add, color: Colors.white),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+        ),
+        icon: const Icon(
+          Icons.search,
+          color: Colors.white,
+          size: 20,
+        ),
+        label: const Text(
+          'Search',
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: 'RobotoMono',
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+      ),
       ),
     );
   }
@@ -167,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (_atlasArticles.isEmpty) {
+    if (_recentDestinations.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -178,10 +208,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Column(
           children: [
-            Icon(Icons.auto_stories_outlined, size: 36, color: Colors.grey.shade400),
+            Icon(Icons.search_off, size: 36, color: Colors.grey.shade400),
             const SizedBox(height: 12),
             Text(
-              'NO ARTICLES YET',
+              'NO RECENT SEARCHES',
               style: TextStyle(
                 fontFamily: 'RobotoMono',
                 fontSize: 13,
@@ -195,50 +225,191 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return Column(
-      children: _atlasArticles.map((article) {
-        final title = article['title'] ?? '';
-        final description = article['description'] ?? '';
-        final duration = article['read_duration'] ?? '';
-        final destination = article['destinations'] as Map<String, dynamic>?;
-        final destName = destination?['name'] ?? '';
-        final destCountry = destination?['country'] ?? '';
+    final int itemCount = _recentDestinations.length + 1;
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: AtlasCard(
-            title: title,
-            description: description,
-            duration: duration,
-            onTap: () {
-              if (destName.isNotEmpty && destCountry.isNotEmpty) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DestinationDetailScreen(
-                      destinationName: destName,
-                      destinationCountry: destCountry,
-                    ),
-                  ),
-                );
+    return SizedBox(
+      height: 440,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Visual Layers stacked correctly
+          AnimatedBuilder(
+            animation: _pageController,
+            builder: (context, child) {
+              double page = 0.0;
+              if (_pageController.hasClients && _pageController.position.haveDimensions) {
+                page = _pageController.page ?? 0.0;
               }
-            },
-            onPlanTap: () {
-              if (destName.isNotEmpty && destCountry.isNotEmpty) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DestinationDetailScreen(
-                      destinationName: destName,
-                      destinationCountry: destCountry,
+
+              List<int> sortedIndices = List.generate(itemCount, (i) => i);
+              sortedIndices.sort((a, b) {
+                final distA = (a - page).abs();
+                final distB = (b - page).abs();
+                return distB.compareTo(distA);
+              });
+
+              return Stack(
+                alignment: Alignment.center,
+                children: sortedIndices.map((index) {
+                  final double diff = (index - page);
+                  final double absDiff = diff.abs();
+
+                  if (absDiff > 2.5) return const SizedBox.shrink();
+
+                  final double scale = (1.0 - (absDiff * 0.15)).clamp(0.0, 1.0);
+                  final double translateX = diff * 210.0;
+                  final double opacity = (1.0 - (absDiff * 0.4)).clamp(0.0, 1.0);
+
+                  return Transform(
+                    transform: Matrix4.identity()
+                      ..translate(translateX, 0.0, 0.0)
+                      ..scale(scale, scale),
+                    alignment: Alignment.center,
+                    child: Opacity(
+                      opacity: opacity,
+                      child: SizedBox(
+                        width: 290,
+                        height: 440,
+                        child: _buildAtlasPage(index),
+                      ),
                     ),
-                  ),
-                );
-              }
+                  );
+                }).toList(),
+              );
             },
           ),
-        );
-      }).toList(),
+          
+          // Invisible hit box / gesture driver layer
+          PageView.builder(
+            controller: _pageController,
+            clipBehavior: Clip.none,
+            itemCount: itemCount,
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () {
+                  final page = (_pageController.hasClients && _pageController.position.haveDimensions) ? _pageController.page ?? 0 : 0;
+                  if ((page - index).abs() < 0.5) {
+                    if (index == _recentDestinations.length) {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => const MyAtlasBottomSheet(),
+                      );
+                    } else {
+                      final dest = _recentDestinations[index];
+                      final title = dest['name'] ?? '';
+                      final destCountry = dest['country'] ?? '';
+                      if (title.isNotEmpty && destCountry.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DestinationDetailScreen(
+                              destinationName: title,
+                              destinationCountry: destCountry,
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  } else {
+                    _pageController.animateToPage(
+                      index,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                },
+                child: Container(color: Colors.transparent),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAtlasPage(int index) {
+    if (index == _recentDestinations.length) {
+      return GestureDetector(
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => const MyAtlasBottomSheet(),
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.arrow_forward_rounded, size: 48, color: Colors.grey.shade400),
+              const SizedBox(height: 12),
+              Text(
+                'See more',
+                style: TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final dest = _recentDestinations[index];
+    final title = dest['name'] ?? '';
+    final description = dest['description'] ?? '';
+    final bestSeason = dest['best_season'];
+    final String? duration = bestSeason != null ? 'Best in $bestSeason' : null;
+    final destCountry = dest['country'] ?? '';
+    final imageUrl = dest['image_url'];
+    final rawRating = dest['rating'];
+    final double? rating = rawRating != null ? (rawRating is int ? rawRating.toDouble() : (rawRating as num).toDouble()) : null;
+    final tags = (dest['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+
+    return AtlasCard(
+      title: title,
+      description: description,
+      duration: duration,
+      imageUrl: imageUrl,
+      rating: rating,
+      tags: tags.take(4).toList(),
+      onTap: () {
+        if (title.isNotEmpty && destCountry.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DestinationDetailScreen(
+                destinationName: title,
+                destinationCountry: destCountry,
+              ),
+            ),
+          );
+        }
+      },
+      onPlanTap: () {
+        if (title.isNotEmpty && destCountry.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DestinationDetailScreen(
+                destinationName: title,
+                destinationCountry: destCountry,
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 

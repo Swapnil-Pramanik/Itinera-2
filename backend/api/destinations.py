@@ -49,6 +49,7 @@ def search_destinations(
                     "format": "json",
                     "addressdetails": 1,
                     "limit": 10,
+                    "accept-language": "en",
                 },
                 headers={"User-Agent": "Itinera-Travel-App/1.0 (swapnil@itinera.dev)"},
             )

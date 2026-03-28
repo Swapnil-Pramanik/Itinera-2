@@ -203,4 +203,33 @@ class DestinationService {
       return [];
     }
   }
+  /// Fetch the actual recent destinations that were fetched and cached in the DB.
+  static Future<List<Map<String, dynamic>>> getRecentDestinations() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('destinations')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(5); // Increased limit to 5 for My Atlas section
+      return List<Map<String, dynamic>>.from(response);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Fetch a larger history of all stored destinations.
+  static Future<List<Map<String, dynamic>>> getAllDestinations() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('destinations')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(50);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e, stack) {
+      print('DestinationService.getAllDestinations Error: $e');
+      print(stack);
+      return [];
+    }
+  }
 }
