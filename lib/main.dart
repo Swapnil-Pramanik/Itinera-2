@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/constants.dart';
 import 'theme/material3_theme.dart';
 import 'screens/auth/login_signup_screen.dart';
+import 'screens/home/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,11 +30,14 @@ class ItineraApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Check if user has an active session to skip login
+    final session = Supabase.instance.client.auth.currentSession;
+
     return MaterialApp(
       title: 'Itinera',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const LoginSignupScreen(),
+      home: session != null ? const HomeScreen() : const LoginSignupScreen(),
     );
   }
 }

@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'constants.dart';
 
 /// Service for fetching and updating user profile data from the backend or Supabase.
 class ProfileService {
-  static const String _backendUrl = 'http://localhost:8000';
+  static const String _backendUrl = AppConstants.backendUrl;
 
   /// Fetches the current user's profile data from the `users` table.
   static Future<Map<String, dynamic>?> getMyProfile() async {

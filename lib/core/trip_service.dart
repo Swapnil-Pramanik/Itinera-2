@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'constants.dart';
 
 /// Service for fetching trip data from the backend or Supabase directly.
 class TripService {
-  static const String _backendUrl = 'http://localhost:8000';
+  static const String _backendUrl = AppConstants.backendUrl;
 
   /// Fetches the current user's trips.
   /// Tries the FastAPI backend first; falls back to direct Supabase query.

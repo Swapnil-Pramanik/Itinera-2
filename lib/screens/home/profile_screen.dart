@@ -47,9 +47,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final displayName = _profileData?['display_name'] ?? UserService.getDisplayName();
     final email = _profileData?['email'] ?? UserService.getEmail();
-    final level = _profileData?['explorer_level'] ?? 1;
-    final tripsCompleted = _profileData?['total_trips_completed'] ?? 0;
-    final placesVisited = _profileData?['total_places_visited'] ?? 0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -109,32 +106,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 4),
 
-            // Explorer Level (from DB)
+            // Email
             Text(
-              'EXPLORER LEVEL $level',
+              email,
               style: TextStyle(
                 fontFamily: 'RobotoMono',
                 fontSize: 12,
                 color: Colors.grey.shade600,
-                letterSpacing: 1,
+                letterSpacing: 0.5,
               ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Real Stats from the database
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStatColumn('TRIPS', tripsCompleted.toString()),
-                Container(
-                  height: 40,
-                  width: 1,
-                  color: Colors.grey.shade300,
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                ),
-                _buildStatColumn('PLACES', placesVisited.toString()),
-              ],
             ),
 
             const SizedBox(height: 32),
@@ -210,31 +190,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildStatColumn(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontFamily: 'RobotoMono',
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'RobotoMono',
-            fontSize: 10,
-            color: Colors.grey.shade500,
-            letterSpacing: 1.5,
-          ),
-        ),
-      ],
     );
   }
 

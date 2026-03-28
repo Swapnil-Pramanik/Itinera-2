@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/user_service.dart';
 import '../../core/trip_service.dart';
+import '../../core/destination_service.dart';
 import '../../widgets/appbars/appbars.dart';
 import '../../widgets/cards/cards.dart';
 import '../../widgets/common/common.dart';
-import '../../widgets/buttons/buttons.dart';
 import 'profile_screen.dart';
 import 'search_bottom_sheet.dart';
 import '../trip/destination_detail_screen.dart';
@@ -20,12 +20,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _trips = [];
+  List<Map<String, dynamic>> _atlasArticles = [];
   bool _isLoadingTrips = true;
+  bool _isLoadingAtlas = true;
 
   @override
   void initState() {
     super.initState();
     _loadTrips();
+    _loadAtlasArticles();
   }
 
   Future<void> _loadTrips() async {
@@ -41,6 +44,24 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoadingTrips = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadAtlasArticles() async {
+    try {
+      final articles = await DestinationService.getAtlasArticles();
+      if (mounted) {
+        setState(() {
+          _atlasArticles = articles;
+          _isLoadingAtlas = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingAtlas = false;
         });
       }
     }
@@ -106,93 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 16),
 
-            // Category chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ChipButton(
-                    label: 'TRENDING',
-                    icon: Icons.trending_up,
-                    isSelected: true,
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 10),
-                  ChipButton(
-                    label: 'SPRING',
-                    isSelected: false,
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 10),
-                  ChipButton(
-                    label: 'WINTER',
-                    isSelected: false,
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 10),
-                  ChipButton(
-                    label: 'HIDDEN',
-                    isSelected: false,
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Atlas cards
-            AtlasCard(
-              title: 'Kyoto in Autumn',
-              description:
-                  'Witness the ancient world transform into a canvas of crimson and gold. A curated guide...',
-              duration: '8 MIN READ',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DestinationDetailScreen(),
-                  ),
-                );
-              },
-              onPlanTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DestinationDetailScreen(),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            AtlasCard(
-              title: 'Nordic Escape',
-              description:
-                  'A complete 7-day automated itinerary for Iceland. Chase the Northern Lights and rela...',
-              duration: '5 MIN',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DestinationDetailScreen(),
-                  ),
-                );
-              },
-              onPlanTap: () {},
-            ),
-
-            const SizedBox(height: 16),
-
-            AtlasCard(
-              title: 'Taste of Tuscany',
-              description:
-                  'Discover the culinary heart of Italy with this food-focused journey through vineyards an...',
-              duration: '10 WEEKS',
-              onTap: () {},
-              onPlanTap: () {},
-            ),
+            // Atlas content
+            _buildAtlasSection(),
 
             const SizedBox(height: 100),
           ],
@@ -210,6 +146,99 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.black,
         child: const Icon(Icons.add, color: Colors.white),
       ),
+    );
+  }
+
+  /// Builds the Atlas section — loading, empty, or dynamic article cards.
+  Widget _buildAtlasSection() {
+    if (_isLoadingAtlas) {
+      return SizedBox(
+        height: 100,
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.grey.shade400,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_atlasArticles.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.auto_stories_outlined, size: 36, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              'NO ARTICLES YET',
+              style: TextStyle(
+                fontFamily: 'RobotoMono',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: _atlasArticles.map((article) {
+        final title = article['title'] ?? '';
+        final description = article['description'] ?? '';
+        final duration = article['read_duration'] ?? '';
+        final destination = article['destinations'] as Map<String, dynamic>?;
+        final destName = destination?['name'] ?? '';
+        final destCountry = destination?['country'] ?? '';
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: AtlasCard(
+            title: title,
+            description: description,
+            duration: duration,
+            onTap: () {
+              if (destName.isNotEmpty && destCountry.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DestinationDetailScreen(
+                      destinationName: destName,
+                      destinationCountry: destCountry,
+                    ),
+                  ),
+                );
+              }
+            },
+            onPlanTap: () {
+              if (destName.isNotEmpty && destCountry.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DestinationDetailScreen(
+                      destinationName: destName,
+                      destinationCountry: destCountry,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        );
+      }).toList(),
     );
   }
 
