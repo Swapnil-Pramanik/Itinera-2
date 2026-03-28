@@ -3,11 +3,13 @@ from core.security import get_current_user
 from core.supabase import get_supabase
 import httpx
 from typing import Optional
+import os
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/api/rest_v1/page/summary"
+UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
 
 # ──────────────────────────────────────────────
@@ -201,18 +203,29 @@ def get_destination_by_name(
             .execute()
         )
         if hasattr(response, "data") and len(response.data) > 0:
-            return response.data[0]
+            dest = response.data[0]
+            if not dest.get("image_url"):
+                new_image_url = _fetch_unsplash_image(dest["name"])
+                if new_image_url:
+                    try:
+                        supabase.table("destinations").update({"image_url": new_image_url}).eq("id", dest["id"]).execute()
+                        dest["image_url"] = new_image_url
+                    except Exception as e:
+                        print(f"Failed to update image_url: {e}")
+            return dest
     except Exception:
         pass
 
-    # 2. Not cached — fetch from Wikipedia
+    # 2. Not cached — fetch from Wikipedia and Unsplash
     description = _fetch_wikipedia_summary(name)
+    image_url = _fetch_unsplash_image(name)
 
     # 3. Insert into destinations table as cache
     new_dest = {
         "name": name,
         "country": country,
         "description": description or f"A destination in {country}.",
+        "image_url": image_url,
         "tags": [],
     }
 
@@ -270,7 +283,16 @@ def get_destination_by_id(
             .execute()
         )
         if hasattr(response, "data") and response.data:
-            return response.data
+            dest = response.data
+            if not dest.get("image_url"):
+                new_image_url = _fetch_unsplash_image(dest["name"])
+                if new_image_url:
+                    try:
+                        supabase.table("destinations").update({"image_url": new_image_url}).eq("id", dest["id"]).execute()
+                        dest["image_url"] = new_image_url
+                    except Exception:
+                        pass
+            return dest
     except Exception:
         pass
 
@@ -288,11 +310,43 @@ def _fetch_wikipedia_summary(topic: str) -> Optional[str]:
             slug = topic.strip().replace(" ", "_")
             resp = client.get(
                 f"{WIKIPEDIA_API_URL}/{slug}",
-                headers={"User-Agent": "Itinera-Travel-App/1.0"},
+                headers={"User-Agent": "Itinera-Travel-App/1.0 (swapnil@itinera.dev)"},
             )
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get("extract", "")
     except Exception:
         pass
+    return None
+
+
+def _fetch_unsplash_image(topic: str) -> Optional[str]:
+    """Fetch a high-res landscape image URL from Unsplash based on the topic."""
+    if not UNSPLASH_ACCESS_KEY:
+        print("[_fetch_unsplash_image] No UNSPLASH_ACCESS_KEY provided.")
+        return None
+
+    try:
+        with httpx.Client(timeout=8.0) as client:
+            resp = client.get(
+                "https://api.unsplash.com/search/photos",
+                params={
+                    "query": topic,
+                    "per_page": 1,
+                    "orientation": "landscape"
+                },
+                headers={
+                    "Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}",
+                    "Accept-Version": "v1"
+                },
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                results = data.get("results", [])
+                if results:
+                    raw_url = results[0].get("urls", {}).get("raw")
+                    if raw_url:
+                        return f"{raw_url}&w=1080&q=80&fit=crop"
+    except Exception as e:
+        print(f"[_fetch_unsplash_image] error: {e}")
     return None

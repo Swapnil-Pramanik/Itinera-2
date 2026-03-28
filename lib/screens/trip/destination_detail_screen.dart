@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/destination_service.dart';
 import '../../widgets/buttons/buttons.dart';
 import '../timeline/timeline_selector_screen.dart';
@@ -17,7 +19,8 @@ class DestinationDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<DestinationDetailScreen> createState() => _DestinationDetailScreenState();
+  State<DestinationDetailScreen> createState() =>
+      _DestinationDetailScreenState();
 }
 
 class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
@@ -25,15 +28,35 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   bool _isLoading = true;
   String? _error;
 
+  final ScrollController _scrollController = ScrollController();
+  bool _isCollapsed = false;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.hasClients) {
+        bool isCollapsed = _scrollController.offset > 200;
+        if (isCollapsed != _isCollapsed) {
+          setState(() {
+            _isCollapsed = isCollapsed;
+          });
+        }
+      }
+    });
+
     if (widget.preloadedData != null) {
       _data = widget.preloadedData;
       _isLoading = false;
     } else {
       _fetchDetails();
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchDetails() async {
@@ -62,13 +85,15 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   // Helpers to extract data with fallbacks
   String get _name => _data?['name'] ?? widget.destinationName;
   String get _country => _data?['country'] ?? widget.destinationCountry;
-  String get _description => _data?['description'] ?? 'Explore this beautiful destination.';
+  String get _description =>
+      _data?['description'] ?? 'Explore this beautiful destination.';
   String? get _bestSeason => _data?['best_season'];
   int? get _minDays => _data?['ideal_duration_min_days'];
   int? get _maxDays => _data?['ideal_duration_max_days'];
   num? get _rating => _data?['rating'];
   int? get _reviewCount => _data?['review_count'];
   num? get _dailyCost => _data?['estimated_daily_cost_usd'];
+  String? get _imageUrl => _data?['image_url'];
   List<Map<String, dynamic>> get _attractions {
     final raw = _data?['attractions'];
     if (raw is List) {
@@ -96,30 +121,30 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.black,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
           ),
         ),
         body: const Center(
-          child: CircularProgressIndicator(color: Colors.black),
+          child: CircularProgressIndicator(color: Colors.white),
         ),
       );
     }
 
     if (_error != null && _data == null) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.black,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
           ),
         ),
         body: Center(
@@ -150,14 +175,29 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.black,
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           // Hero image app bar
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
             backgroundColor: Colors.black,
+            title: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _isCollapsed ? 1.0 : 0.0,
+              child: Text(
+                _name,
+                style: const TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            centerTitle: true,
             leading: IconButton(
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -176,14 +216,32 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Container(
-                    color: Colors.grey.shade800,
-                    child: const Icon(
-                      Icons.image,
-                      size: 60,
-                      color: Colors.grey,
+                  if (_imageUrl != null && _imageUrl!.isNotEmpty)
+                    CachedNetworkImage(
+                      imageUrl: _imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey.shade800,
+                        child: const Center(
+                          child:
+                              CircularProgressIndicator(color: Colors.white54),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey.shade900,
+                        child: const Icon(Icons.broken_image,
+                            size: 60, color: Colors.grey),
+                      ),
+                    )
+                  else
+                    Container(
+                      color: Colors.grey.shade800,
+                      child: const Icon(
+                        Icons.image,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
                     ),
-                  ),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -191,32 +249,12 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
+                          Colors.black.withOpacity(0.1),
                           Colors.black.withOpacity(0.7),
+                          Colors.black,
                         ],
+                        stops: const [0.0, 0.5, 0.85, 1.0],
                       ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 80,
-                    left: 20,
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.place,
-                          size: 14,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _country.toUpperCase(),
-                          style: TextStyle(
-                            fontFamily: 'RobotoMono',
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.8),
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                   Positioned(
@@ -234,34 +272,53 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                             color: Colors.white,
                           ),
                         ),
-                        if (_rating != null) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(Icons.star, size: 16, color: Colors.amber),
-                              const SizedBox(width: 4),
-                              Text(
-                                _rating.toString(),
-                                style: const TextStyle(
-                                  fontFamily: 'RobotoMono',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.place,
+                              size: 14,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _country.toUpperCase(),
+                              style: TextStyle(
+                                fontFamily: 'RobotoMono',
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.9),
+                                letterSpacing: 1,
                               ),
-                              if (_reviewCount != null) ...[
-                                const SizedBox(width: 8),
-                                Text(
-                                  '(${_formatCount(_reviewCount!)} reviews)',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.star,
+                                size: 16, color: Colors.amber),
+                            const SizedBox(width: 4),
+                            Text(
+                              _rating != null ? _rating.toString() : '--',
+                              style: const TextStyle(
+                                fontFamily: 'RobotoMono',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _reviewCount != null
+                                  ? '(${_formatCount(_reviewCount!)} reviews)'
+                                  : '(-- reviews)',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -273,7 +330,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           // Content
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -282,12 +339,24 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      if (_bestSeason != null)
-                        _buildInfoChip(Icons.wb_sunny_outlined, _bestSeason!.contains('in') ? _bestSeason! : 'Best in $_bestSeason'),
-                      if (_durationLabel.isNotEmpty)
-                        _buildInfoChip(Icons.schedule, _durationLabel),
-                      if (_dailyCost != null)
-                        _buildInfoChip(Icons.attach_money, '\$${_dailyCost!.round()}/day'),
+                      _buildInfoChip(
+                        Icons.wb_sunny_outlined,
+                        _bestSeason != null
+                            ? (_bestSeason!.contains('in')
+                                ? _bestSeason!
+                                : 'Best in $_bestSeason')
+                            : '-- Season',
+                      ),
+                      _buildInfoChip(
+                        Icons.schedule,
+                        _durationLabel.isNotEmpty ? _durationLabel : '-- Days',
+                      ),
+                      _buildInfoChip(
+                        Icons.attach_money,
+                        _dailyCost != null
+                            ? '\$${_dailyCost!.round()}/day'
+                            : '--/day',
+                      ),
                     ],
                   ),
 
@@ -300,6 +369,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                       fontFamily: 'RobotoMono',
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
                   ),
 
@@ -309,7 +379,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     _description,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade700,
+                      color: Colors.white.withOpacity(0.8),
                       height: 1.6,
                     ),
                   ),
@@ -317,40 +387,38 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                   const SizedBox(height: 24),
 
                   // Top attractions
-                  if (_attractions.isNotEmpty) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Top attractions',
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Top attractions',
+                        style: TextStyle(
+                          fontFamily: 'RobotoMono',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {},
+                        child: Text(
+                          'See all',
                           style: TextStyle(
                             fontFamily: 'RobotoMono',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: Colors.white60,
                           ),
                         ),
-                        if (_attractions.length > 4)
-                          TextButton(
-                            onPressed: () {},
-                            child: Text(
-                              'See all',
-                              style: TextStyle(
-                                fontFamily: 'RobotoMono',
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
 
-                    const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                    // Attractions grid — show up to 4 in 2x2
-                    _buildAttractionsGrid(),
+                  // Attractions grid — show up to 4 in 2x2
+                  _buildAttractionsGrid(),
 
-                    const SizedBox(height: 32),
-                  ],
+                  const SizedBox(height: 32),
 
                   // Location
                   const Text(
@@ -359,6 +427,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                       fontFamily: 'RobotoMono',
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
                   ),
 
@@ -368,8 +437,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                   Container(
                     height: 150,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: Colors.grey.shade900,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white10),
                     ),
                     child: Stack(
                       children: [
@@ -377,7 +447,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                           child: Icon(
                             Icons.map_outlined,
                             size: 40,
-                            color: Colors.grey.shade400,
+                            color: Colors.white24,
                           ),
                         ),
                         Positioned(
@@ -389,11 +459,11 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Colors.grey.shade800,
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withOpacity(0.3),
                                   blurRadius: 8,
                                 ),
                               ],
@@ -404,16 +474,16 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                                 Icon(
                                   Icons.open_in_new,
                                   size: 14,
-                                  color: Colors.grey.shade700,
+                                  color: Colors.white,
                                 ),
                                 const SizedBox(width: 6),
-                                Text(
+                                const Text(
                                   'Open Map',
                                   style: TextStyle(
                                     fontFamily: 'RobotoMono',
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    color: Colors.grey.shade700,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ],
@@ -424,7 +494,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 70),
                 ],
               ),
             ),
@@ -435,15 +505,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
       // Bottom bar
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
-            ),
-          ],
+        decoration: const BoxDecoration(
+          color: Colors.black,
+          border: Border(top: BorderSide(color: Colors.white10)),
         ),
         child: SafeArea(
           child: Row(
@@ -457,7 +521,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     style: TextStyle(
                       fontFamily: 'RobotoMono',
                       fontSize: 10,
-                      color: Colors.grey.shade600,
+                      color: Colors.white60,
                       letterSpacing: 1,
                     ),
                   ),
@@ -467,6 +531,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                       fontFamily: 'RobotoMono',
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -493,7 +558,14 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   }
 
   Widget _buildAttractionsGrid() {
-    final toShow = _attractions.take(4).toList();
+    final toShow = _attractions.isNotEmpty
+        ? _attractions.take(4).toList()
+        : [
+            {'name': '--', 'location_area': '--'},
+            {'name': '--', 'location_area': '--'},
+            {'name': '--', 'location_area': '--'},
+            {'name': '--', 'location_area': '--'},
+          ];
     final rows = <Widget>[];
 
     for (var i = 0; i < toShow.length; i += 2) {
@@ -503,6 +575,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
             child: _buildAttractionCard(
               toShow[i]['name'] ?? '',
               toShow[i]['location_area'] ?? '',
+              toShow[i]['image_url'],
             ),
           ),
           const SizedBox(width: 12),
@@ -511,6 +584,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
               child: _buildAttractionCard(
                 toShow[i + 1]['name'] ?? '',
                 toShow[i + 1]['location_area'] ?? '',
+                toShow[i + 1]['image_url'],
               ),
             )
           else
@@ -528,20 +602,21 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.grey.shade700),
+          Icon(icon, size: 14, color: Colors.white70),
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'RobotoMono',
               fontSize: 12,
-              color: Colors.grey.shade700,
+              color: Colors.white70,
             ),
           ),
         ],
@@ -549,15 +624,72 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     );
   }
 
-  Widget _buildAttractionCard(String title, String location) {
+  Widget _buildAttractionCard(String title, String location, String? imageUrl) {
+    // Generate a beautiful fallback gradient based on title length/hash
+    final colors = [
+      [Colors.blue.shade800, Colors.purple.shade800],
+      [Colors.teal.shade800, Colors.blue.shade800],
+      [Colors.indigo.shade800, Colors.deepPurple.shade800],
+      [Colors.orange.shade800, Colors.red.shade800],
+    ];
+    final colorPair = colors[title.length % colors.length];
+
     return Container(
       height: 120,
       decoration: BoxDecoration(
-        color: Colors.grey.shade300,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Stack(
+        fit: StackFit.expand,
         children: [
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(color: colorPair[0]),
+              errorWidget: (context, url, error) => Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: colorPair,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: colorPair,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child:
+                  const Icon(Icons.landscape, color: Colors.white24, size: 40),
+            ),
+          // Gradient overlay for text readability
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.8),
+                ],
+              ),
+            ),
+          ),
           Positioned(
             left: 12,
             bottom: 12,
