@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/destination_service.dart';
 import '../../widgets/buttons/buttons.dart';
+import '../../widgets/overlays/weather_popup.dart';
+import '../../widgets/overlays/weather_theme.dart';
 import '../timeline/timeline_selector_screen.dart';
 
 /// Destination Detail Screen - Dynamic city overview with attractions
 class DestinationDetailScreen extends StatefulWidget {
   final String destinationName;
   final String destinationCountry;
+  final double? latitude;
+  final double? longitude;
   final Map<String, dynamic>? preloadedData;
 
   const DestinationDetailScreen({
     super.key,
     required this.destinationName,
     required this.destinationCountry,
+    this.latitude,
+    this.longitude,
     this.preloadedData,
   });
 
@@ -25,6 +32,7 @@ class DestinationDetailScreen extends StatefulWidget {
 
 class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   Map<String, dynamic>? _data;
+  Map<String, dynamic>? _weather;
   bool _isLoading = true;
   String? _error;
 
@@ -64,6 +72,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
       final data = await DestinationService.getDestinationByName(
         widget.destinationName,
         widget.destinationCountry,
+        lat: widget.latitude,
+        lon: widget.longitude,
       );
       if (mounted) {
         setState(() {
@@ -115,6 +125,47 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
       return '\$$total';
     }
     return '--';
+  }
+
+  String _parseWeatherCode(dynamic code) {
+    if (code == null) return 'Unknown';
+    final intCode = code is int ? code : int.tryParse(code.toString()) ?? -1;
+    if (intCode == 0) return 'Clear';
+    if (intCode >= 1 && intCode <= 3) return 'Cloudy';
+    if (intCode == 45 || intCode == 48) return 'Fog';
+    if (intCode >= 51 && intCode <= 57) return 'Drizzle';
+    if (intCode >= 61 && intCode <= 67) return 'Rain';
+    if (intCode >= 71 && intCode <= 77) return 'Snow';
+    if (intCode >= 80 && intCode <= 82) return 'Showers';
+    if (intCode >= 95) return 'Storm';
+    return 'Clear';
+  }
+
+  Map<String, dynamic>? get _weatherData => _data?['metadata']?['weather'] ?? _weather;
+
+  String get _weatherLabel {
+    final weather = _weatherData;
+    if (weather != null) {
+      final current = weather['current'];
+      if (current != null) {
+        final temp = current['temperature_2m'];
+        final code = current['weather_code'];
+        return '${temp?.round() ?? '--'}°C, ${_parseWeatherCode(code)}';
+      }
+    }
+    if (_bestSeason != null) {
+      return _bestSeason!.contains('in') ? _bestSeason! : 'Best in $_bestSeason';
+    }
+    return '-- Season';
+  }
+
+  Future<void> _launchGoogleMaps() async {
+    // Use name search for better "Human" results in Google Maps
+    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(_name)}');
+    
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
@@ -224,10 +275,6 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
                         color: Colors.grey.shade800,
-                        child: const Center(
-                          child:
-                              CircularProgressIndicator(color: Colors.white54),
-                        ),
                       ),
                       errorWidget: (context, url, error) => Container(
                         color: Colors.grey.shade900,
@@ -332,7 +379,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           // Content
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -343,11 +390,48 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     children: [
                       _buildInfoChip(
                         Icons.wb_sunny_outlined,
-                        _bestSeason != null
-                            ? (_bestSeason!.contains('in')
-                                ? _bestSeason!
-                                : 'Best in $_bestSeason')
-                            : '-- Season',
+                        _weatherLabel,
+                        bgColor: WeatherThemeMapper.getTheme(_weatherData?['current']?['weather_code']).buttonBg,
+                        accentColor: WeatherThemeMapper.getTheme(_weatherData?['current']?['weather_code']).accentColor,
+                        heroTag: 'weather-hero-${_data?['id']}',
+                        onTap: () {
+                          final weather = _weatherData;
+                          if (weather != null) {
+                            Navigator.push(
+                              context,
+                              PageRouteBuilder(
+                                opaque: false,
+                                barrierDismissible: true,
+                                transitionDuration: const Duration(milliseconds: 700),
+                                reverseTransitionDuration: const Duration(milliseconds: 250),
+                                pageBuilder: (context, animation, secondaryAnimation) => WeatherPopup(
+                                  locationName: _name,
+                                  weatherData: weather,
+                                  heroTag: 'weather-hero-${_data?['id']}',
+                                ),
+                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                  final curve = animation.status == AnimationStatus.forward
+                                      ? Curves.easeOutBack
+                                      : Curves.easeInBack;
+                                  
+                                  return ScaleTransition(
+                                    scale: CurvedAnimation(
+                                      parent: animation,
+                                      curve: curve,
+                                    ),
+                                    child: FadeTransition(
+                                      opacity: CurvedAnimation(
+                                        parent: animation,
+                                        curve: const Interval(0.0, 0.7, curve: Curves.linear),
+                                      ),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          }
+                        },
                       ),
                       _buildInfoChip(
                         Icons.schedule,
@@ -435,68 +519,116 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
                   const SizedBox(height: 12),
 
-                  // Map placeholder
-                  Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade900,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: Stack(
-                      children: [
-                        Center(
-                          child: Icon(
-                            Icons.map_outlined,
-                            size: 40,
-                            color: Colors.white24,
-                          ),
-                        ),
-                        Positioned(
-                          right: 12,
-                          bottom: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade800,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.open_in_new,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'Open Map',
-                                  style: TextStyle(
-                                    fontFamily: 'RobotoMono',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white,
+                  // Aerial Visual Card (Map)
+                  GestureDetector(
+                    onTap: _launchGoogleMaps,
+                    child: Container(
+                      height: 350,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade900,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: 'https://api.maptiler.com/maps/basic-v2/static/${widget.longitude ?? _data?['longitude'] ?? 73.8567},${widget.latitude ?? _data?['latitude'] ?? 18.5204},12/600x400@2x.png?key=GfuxUc0Qb7MFssVNEWXu&markers=${widget.longitude ?? _data?['longitude'] ?? 73.8567},${widget.latitude ?? _data?['latitude'] ?? 18.5204}',
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(color: Colors.grey.shade900, child: const Center(child: CircularProgressIndicator())),
+                              errorWidget: (context, url, error) => CachedNetworkImage(
+                                imageUrl: 'https://maps.googleapis.com/maps/api/staticmap?center=${widget.latitude ?? _data?['latitude'] ?? 18.5204},${widget.longitude ?? _data?['longitude'] ?? 73.8567}&zoom=13&size=600x400',
+                                fit: BoxFit.cover,
+                                errorWidget: (context, url, error) => CachedNetworkImage(
+                                  imageUrl: 'https://static-maps.yandex.ru/1.x/?lang=en_US&ll=${widget.longitude ?? _data?['longitude'] ?? 73.8567},${widget.latitude ?? _data?['latitude'] ?? 18.5204}&size=600,400&z=12&l=map&pt=${widget.longitude ?? _data?['longitude'] ?? 73.8567},${widget.latitude ?? _data?['latitude'] ?? 18.5204},pmwtm1',
+                                  fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) => CachedNetworkImage(
+                                    imageUrl: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?q=80&w=2070&auto=format&fit=crop', // High-fidelity aerial city fallback
+                                    fit: BoxFit.cover,
+                                    color: Colors.black.withOpacity(0.4),
+                                    colorBlendMode: BlendMode.darken,
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                            // Dark Navigation Badge
+                            Positioned(
+                              right: 20,
+                              bottom: 20,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.white10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.4),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Image.asset(
+                                      'assets/map_16509523.png',
+                                      width: 20,
+                                      height: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'GOOGLE MAPS',
+                                      style: TextStyle(
+                                        fontFamily: 'RobotoMono',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Discovery Overlay
+                            Positioned(
+                              left: 20,
+                              top: 20,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _name.toUpperCase(),
+                                    style: TextStyle(
+                                      fontFamily: 'RobotoMono',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.black.withOpacity(0.8),
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                  Text(
+                                    'TAP TO EXPLORE CITY',
+                                    style: TextStyle(
+                                      fontFamily: 'RobotoMono',
+                                      fontSize: 10,
+                                      color: Colors.black.withOpacity(0.5),
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-
-                  const SizedBox(height: 70),
                 ],
               ),
             ),
@@ -626,30 +758,66 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     return Column(children: rows);
   }
 
-  Widget _buildInfoChip(IconData icon, String label) {
-    return Container(
+  Widget _buildInfoChip(IconData icon, String label, {VoidCallback? onTap, String? heroTag, Color? bgColor, Color? accentColor}) {
+    final effectiveBg = bgColor ?? (onTap != null ? Colors.blue.withOpacity(0.2) : Colors.white.withOpacity(0.1));
+    final effectiveAccent = accentColor ?? (onTap != null ? Colors.blue.shade200 : Colors.white70);
+    final effectiveText = accentColor != null ? accentColor.withOpacity(0.8) : (onTap != null ? Colors.blue.shade100 : Colors.white70);
+
+    Widget chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: effectiveBg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(
+          color: effectiveBg.withOpacity(0.3),
+        ),
+        boxShadow: onTap != null ? [
+          BoxShadow(
+            color: effectiveBg.withOpacity(0.1),
+            blurRadius: 8,
+            spreadRadius: 1,
+          )
+        ] : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white70),
+          Icon(icon, size: 14, color: effectiveAccent),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'RobotoMono',
               fontSize: 12,
-              color: Colors.white70,
+              color: effectiveText,
+              fontWeight: onTap != null ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
         ],
       ),
     );
+
+    if (heroTag != null) {
+      chip = Hero(
+        tag: heroTag,
+        placeholderBuilder: (context, size, widget) => widget,
+        flightShuttleBuilder: (flightContext, animation, flightDirection, fromHeroContext, toHeroContext) {
+          return SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: toHeroContext.widget,
+          );
+        },
+        child: Material(color: Colors.transparent, child: chip),
+      );
+    }
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: chip,
+      );
+    }
+    return chip;
   }
 
   Widget _buildAttractionCard(String title, String location, String? imageUrl) {

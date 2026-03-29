@@ -4,6 +4,7 @@ from core.supabase import get_supabase
 import httpx
 from typing import Optional
 import os
+from core.weather import get_weather_forecast
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -182,9 +183,11 @@ def get_atlas_articles(user_payload: dict = Depends(get_current_user)):
 # ──────────────────────────────────────────────
 
 @router.get("/detail-by-name")
-def get_destination_by_name(
+async def get_destination_by_name(
     name: str = Query(..., description="Destination name"),
     country: str = Query(..., description="Country name"),
+    lat: Optional[float] = Query(None, description="Latitude"),
+    lon: Optional[float] = Query(None, description="Longitude"),
     user_payload: dict = Depends(get_current_user),
 ):
     """
@@ -205,14 +208,54 @@ def get_destination_by_name(
         )
         if hasattr(response, "data") and len(response.data) > 0:
             dest = response.data[0]
+            needs_update = False
+            
+            # Update missing coordinates if provided or through lookup
+            current_lat = dest.get("latitude")
+            current_lon = dest.get("longitude")
+            
+            if current_lat is None or current_lon is None:
+                if lat is not None and lon is not None:
+                    dest["latitude"] = lat
+                    dest["longitude"] = lon
+                    needs_update = True
+                else:
+                    # Recovery: lookup coords via Nominatim
+                    coords = await _fetch_nominatim_coords(name, country)
+                    if coords:
+                        dest["latitude"] = coords["lat"]
+                        dest["longitude"] = coords["lon"]
+                        needs_update = True
+            
+            # Fetch / Update Image
             if not dest.get("image_url"):
                 new_image_url = _fetch_unsplash_image(dest["name"])
                 if new_image_url:
-                    try:
-                        supabase.table("destinations").update({"image_url": new_image_url}).eq("id", dest["id"]).execute()
-                        dest["image_url"] = new_image_url
-                    except Exception as e:
-                        print(f"Failed to update image_url: {e}")
+                    dest["image_url"] = new_image_url
+                    needs_update = True
+                    
+            # Fetch / Cache Weather
+            final_lat = dest.get("latitude")
+            final_lon = dest.get("longitude")
+            if final_lat is not None and final_lon is not None:
+                weather_data = await get_weather_forecast(lat=float(final_lat), lon=float(final_lon))
+                if weather_data:
+                    if dest.get("metadata") is None:
+                        dest["metadata"] = {}
+                    dest["metadata"]["weather"] = weather_data
+                    needs_update = True
+            
+            if needs_update:
+                try:
+                    update_payload = {}
+                    if "latitude" in dest: update_payload["latitude"] = dest["latitude"]
+                    if "longitude" in dest: update_payload["longitude"] = dest["longitude"]
+                    if "image_url" in dest: update_payload["image_url"] = dest["image_url"]
+                    if "metadata" in dest: update_payload["metadata"] = dest["metadata"]
+                    supabase.table("destinations").update(update_payload).eq("id", dest["id"]).execute()
+                except Exception as e:
+                    print(f"Failed to update cache: {e}")
+                    
             return dest
     except Exception:
         pass
@@ -220,13 +263,30 @@ def get_destination_by_name(
     # 2. Not cached — fetch from Wikipedia and Unsplash
     description = _fetch_wikipedia_summary(name)
     image_url = _fetch_unsplash_image(name)
+    
+    # Also find coordinates for new destination
+    final_lat, final_lon = lat, lon
+    if final_lat is None or final_lon is None:
+        coords = await _fetch_nominatim_coords(name, country)
+        if coords:
+            final_lat, final_lon = coords["lat"], coords["lon"]
 
-    # 3. Insert into destinations table as cache
+    # 3. Fetch Weather for new destination
+    metadata = {}
+    if final_lat is not None and final_lon is not None:
+        weather_data = await get_weather_forecast(lat=float(final_lat), lon=float(final_lon))
+        if weather_data:
+            metadata["weather"] = weather_data
+
+    # 4. Insert into destinations table as cache
     new_dest = {
         "name": name,
         "country": country,
         "description": description or f"A destination in {country}.",
         "image_url": image_url,
+        "latitude": final_lat,
+        "longitude": final_lon,
+        "metadata": metadata,
         "tags": [],
     }
 
@@ -263,12 +323,60 @@ def get_destination_by_name(
 
 
 # ──────────────────────────────────────────────
-# 5. Get destination by ID (from DB)
+# 5. Get weather by destination ID
+# ──────────────────────────────────────────────
+
+@router.get("/{destination_id}/weather")
+async def get_destination_weather(
+    destination_id: str,
+    user_payload: dict = Depends(get_current_user),
+):
+    """Fetch current and forecasted weather for a destination."""
+    supabase = get_supabase()
+
+    # 1. Get destination coordinates
+    try:
+        response = (
+            supabase.table("destinations")
+            .select("latitude, longitude")
+            .eq("id", destination_id)
+            .single()
+            .execute()
+        )
+        if not (hasattr(response, "data") and response.data):
+            raise ValueError("Destination has no data")
+            
+        data = response.data
+        lat = data.get("latitude")
+        lon = data.get("longitude")
+        
+        if lat is None or lon is None:
+            raise HTTPException(status_code=400, detail="Destination lacks coordinates")
+            
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=404, detail="Destination not found")
+
+    # 2. Fetch weather using core service
+    weather_data = await get_weather_forecast(lat=float(lat), lon=float(lon))
+    
+    if weather_data:
+        return weather_data
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
+            detail="Weather service unavailable"
+        )
+
+
+# ──────────────────────────────────────────────
+# 6. Get destination by ID (from DB)
 #    Path param route LAST to avoid conflicts
 # ──────────────────────────────────────────────
 
 @router.get("/{destination_id}")
-def get_destination_by_id(
+async def get_destination_by_id(
     destination_id: str,
     user_payload: dict = Depends(get_current_user),
 ):
@@ -285,14 +393,45 @@ def get_destination_by_id(
         )
         if hasattr(response, "data") and response.data:
             dest = response.data
+            needs_update = False
+            
+            # Recovery: Lookup coordinates if missing
+            current_lat = dest.get("latitude")
+            current_lon = dest.get("longitude")
+            if current_lat is None or current_lon is None:
+                coords = await _fetch_nominatim_coords(dest["name"], dest["country"])
+                if coords:
+                    dest["latitude"] = coords["lat"]
+                    dest["longitude"] = coords["lon"]
+                    needs_update = True
+            
             if not dest.get("image_url"):
                 new_image_url = _fetch_unsplash_image(dest["name"])
                 if new_image_url:
-                    try:
-                        supabase.table("destinations").update({"image_url": new_image_url}).eq("id", dest["id"]).execute()
-                        dest["image_url"] = new_image_url
-                    except Exception:
-                        pass
+                    dest["image_url"] = new_image_url
+                    needs_update = True
+                    
+            final_lat = dest.get("latitude")
+            final_lon = dest.get("longitude")
+            if final_lat is not None and final_lon is not None:
+                weather_data = await get_weather_forecast(lat=float(final_lat), lon=float(final_lon))
+                if weather_data:
+                    if dest.get("metadata") is None:
+                        dest["metadata"] = {}
+                    dest["metadata"]["weather"] = weather_data
+                    needs_update = True
+                    
+            if needs_update:
+                try:
+                    update_payload = {}
+                    if "latitude" in dest: update_payload["latitude"] = dest["latitude"]
+                    if "longitude" in dest: update_payload["longitude"] = dest["longitude"]
+                    if "image_url" in dest: update_payload["image_url"] = dest["image_url"]
+                    if "metadata" in dest: update_payload["metadata"] = dest["metadata"]
+                    supabase.table("destinations").update(update_payload).eq("id", dest["id"]).execute()
+                except Exception:
+                    pass
+                    
             return dest
     except Exception:
         pass
@@ -350,4 +489,29 @@ def _fetch_unsplash_image(topic: str) -> Optional[str]:
                         return f"{raw_url}&w=1080&q=80&fit=crop"
     except Exception as e:
         print(f"[_fetch_unsplash_image] error: {e}")
+    return None
+
+async def _fetch_nominatim_coords(name: str, country: str) -> Optional[dict]:
+    """Fetch coordinates from Nominatim based on destination name and country."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                NOMINATIM_URL,
+                params={
+                    "q": f"{name}, {country}",
+                    "format": "json",
+                    "limit": 1,
+                    "accept-language": "en",
+                },
+                headers={"User-Agent": "Itinera-Travel-App/1.0 (swapnil@itinera.dev)"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data:
+                    return {
+                        "lat": float(data[0].get("lat")),
+                        "lon": float(data[0].get("lon"))
+                    }
+    except Exception as e:
+        print(f"[_fetch_nominatim_coords] error: {e}")
     return None

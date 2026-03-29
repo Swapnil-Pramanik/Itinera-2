@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/destination_service.dart';
-import '../trip/destination_detail_screen.dart';
+import '../../widgets/overlays/loading_buffer_screen.dart';
 
 /// Search Bottom Sheet - Modal for searching destinations with live Nominatim search
 class SearchBottomSheet extends StatefulWidget {
@@ -66,14 +66,16 @@ class _SearchBottomSheetState extends State<SearchBottomSheet> {
     }
   }
 
-  void _navigateToDestination(String name, String country) {
+  void _navigateToDestination(String name, String country, {double? lat, double? lon}) {
     Navigator.pop(context);
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DestinationDetailScreen(
+        builder: (context) => LoadingBufferScreen(
           destinationName: name,
           destinationCountry: country,
+          latitude: lat,
+          longitude: lon,
         ),
       ),
     );
@@ -202,7 +204,12 @@ class _SearchBottomSheetState extends State<SearchBottomSheet> {
           country: country,
           isCached: isCached,
           rating: rating?.toString(),
-          onTap: () => _navigateToDestination(name, country),
+          onTap: () => _navigateToDestination(
+            name,
+            country,
+            lat: item['lat'] != null ? (item['lat'] is int ? (item['lat'] as int).toDouble() : item['lat']) : item['latitude'],
+            lon: item['lon'] != null ? (item['lon'] is int ? (item['lon'] as int).toDouble() : item['lon']) : item['longitude'],
+          ),
         );
       },
     );

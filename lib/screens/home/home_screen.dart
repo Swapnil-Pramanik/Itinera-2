@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../../core/user_service.dart';
 import '../../core/trip_service.dart';
 import '../../core/destination_service.dart';
 import '../../widgets/appbars/appbars.dart';
 import '../../widgets/cards/cards.dart';
 import '../../widgets/common/common.dart';
+import '../trip/trip_scheduled_screen.dart';
+import '../../widgets/overlays/loading_buffer_screen.dart';
+import 'my_atlas_bottom_sheet.dart';
 import 'profile_screen.dart';
 import 'search_bottom_sheet.dart';
-import 'my_atlas_bottom_sheet.dart';
-import '../trip/destination_detail_screen.dart';
-
-import '../trip/trip_scheduled_screen.dart';
 
 /// Home Screen - Main dashboard with trips and atlas
 class HomeScreen extends StatefulWidget {
@@ -154,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             builder: (context) => const SearchBottomSheet(),
-          );
+          ).then((_) => _loadAtlasArticles());
         },
         backgroundColor: Colors.black,
         shape: RoundedRectangleBorder(
@@ -256,9 +256,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   if (absDiff > 2.5) return const SizedBox.shrink();
 
-                  final double scale = (1.0 - (absDiff * 0.15)).clamp(0.0, 1.0);
-                  final double translateX = diff * 210.0;
-                  final double opacity = (1.0 - (absDiff * 0.4)).clamp(0.0, 1.0);
+                  final double scale = math.pow((1.0 - (absDiff * 0.2)).clamp(0.0, 1.0), 1.5).toDouble();
+                  final double translateX = diff * 220.0;
+                  final double opacity = math.pow((1.0 - (absDiff * 0.5)).clamp(0.0, 1.0), 2).toDouble();
 
                   return Transform(
                     transform: Matrix4.identity()
@@ -304,12 +304,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => DestinationDetailScreen(
+                            builder: (context) => LoadingBufferScreen(
                               destinationName: title,
                               destinationCountry: destCountry,
+                              latitude: dest['latitude'],
+                              longitude: dest['longitude'],
                             ),
                           ),
-                        );
+                        ).then((_) => _loadAtlasArticles());
                       }
                     }
                   } else {
@@ -389,12 +391,14 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => DestinationDetailScreen(
+              builder: (context) => LoadingBufferScreen(
                 destinationName: title,
                 destinationCountry: destCountry,
+                latitude: dest['latitude'],
+                longitude: dest['longitude'],
               ),
             ),
-          );
+          ).then((_) => _loadAtlasArticles());
         }
       },
       onPlanTap: () {
@@ -402,7 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => DestinationDetailScreen(
+              builder: (context) => LoadingBufferScreen(
                 destinationName: title,
                 destinationCountry: destCountry,
               ),
@@ -477,41 +481,107 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildEmptyTripsState() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      height: 220,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey.shade200,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.explore_outlined,
-            size: 40,
-            color: Colors.grey.shade400,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'NO TRIPS PLANNED YET',
-            style: TextStyle(
-              fontFamily: 'RobotoMono',
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
-              letterSpacing: 1,
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Layer 1: Your Custom Collage
+          Positioned.fill(
+            child: Image.asset(
+              'assets/collage.jpg',
+              fit: BoxFit.cover,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Tap + to explore destinations\nand plan your first adventure.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade500,
-              height: 1.5,
+
+          // Layer 2: Darkened Readability Overlay
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.4),
+                  Colors.black.withOpacity(0.7),
+                ],
+              ),
+            ),
+          ),
+
+          // Layer 3: Content
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'NO TRIPS PLANNED YET',
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 2,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'The world is waiting for you.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.7),
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => const SearchBottomSheet(),
+                      ).then((_) => _loadAtlasArticles());
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'PLAN YOUR ADVENTURE',
+                      style: TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

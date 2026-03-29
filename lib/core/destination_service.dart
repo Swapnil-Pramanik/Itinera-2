@@ -56,18 +56,27 @@ class DestinationService {
   }
 
   /// Get destination details by name+country — backend creates/caches via Wikipedia if needed.
-  static Future<Map<String, dynamic>?> getDestinationByName(String name, String country) async {
+  static Future<Map<String, dynamic>?> getDestinationByName(
+    String name,
+    String country, {
+    double? lat,
+    double? lon,
+  }) async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return null;
 
     // Try backend
     try {
-      final response = await http.get(
-        Uri.parse(
-          '$_backendUrl/api/destinations/detail-by-name'
+      var url = '$_backendUrl/api/destinations/detail-by-name'
           '?name=${Uri.encodeComponent(name)}'
-          '&country=${Uri.encodeComponent(country)}',
-        ),
+          '&country=${Uri.encodeComponent(country)}';
+
+      if (lat != null && lon != null) {
+        url += '&lat=$lat&lon=$lon';
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
         headers: {
           'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',
@@ -128,6 +137,33 @@ class DestinationService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Get weather by destination ID.
+  static Future<Map<String, dynamic>?> getDestinationWeather(String id) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return null;
+
+    try {
+      final url = '$_backendUrl/api/destinations/$id/weather';
+      debugPrint('[DestinationService] Fetching weather from: $url');
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        debugPrint('[DestinationService] Failed to fetch weather: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('[DestinationService] Error fetching weather: $e');
+    }
+    return null;
   }
 
   /// Fetch atlas articles for home screen.
