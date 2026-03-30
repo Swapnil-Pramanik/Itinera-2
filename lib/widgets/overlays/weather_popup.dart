@@ -136,6 +136,7 @@ class WeatherPopup extends StatelessWidget {
                             Expanded(
                               flex: 6,
                               child: Column(
+                                mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
@@ -147,7 +148,8 @@ class WeatherPopup extends StatelessWidget {
                                     ),
                                   ),
                                   const SizedBox(height: 16),
-                                  Expanded(
+                                  SizedBox(
+                                    height: 150, // Increased height to prevent overflow
                                     child: _buildHourlyList(hourly),
                                   ),
                                 ],

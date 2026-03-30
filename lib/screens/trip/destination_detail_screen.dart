@@ -802,10 +802,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
         tag: heroTag,
         placeholderBuilder: (context, size, widget) => widget,
         flightShuttleBuilder: (flightContext, animation, flightDirection, fromHeroContext, toHeroContext) {
-          return SingleChildScrollView(
-            physics: const NeverScrollableScrollPhysics(),
-            child: toHeroContext.widget,
-          );
+          return toHeroContext.widget;
         },
         child: Material(color: Colors.transparent, child: chip),
       );

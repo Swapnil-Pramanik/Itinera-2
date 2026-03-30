@@ -295,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         isScrollControlled: true,
                         backgroundColor: Colors.transparent,
                         builder: (_) => const MyAtlasBottomSheet(),
-                      );
+                      ).then((_) => _loadAtlasArticles());
                     } else {
                       final dest = _recentDestinations[index];
                       final title = dest['name'] ?? '';
@@ -411,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 destinationCountry: destCountry,
               ),
             ),
-          );
+          ).then((_) => _loadAtlasArticles());
         }
       },
     );

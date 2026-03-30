@@ -4,6 +4,7 @@ import 'package:lottie/lottie.dart';
 
 import 'onboarding_completion_screen.dart';
 import '../../widgets/blur_page_route.dart';
+import '../../core/preference_service.dart';
 
 /// Onboarding Screen 3 - Preferences selection with multi-step wizard
 class Onboarding3Screen extends StatefulWidget {
@@ -17,6 +18,7 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen>
     with SingleTickerProviderStateMixin {
   // Current step (0-3)
   int _currentStep = 0;
+  bool _isLoading = false;
 
   // Selection state
   String _selectedStyle = 'BALANCED';
@@ -71,13 +73,31 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen>
       // Animate in
       await _animationController.reverse();
     } else {
-      // Final step - navigate to completion
-      Navigator.push(
-        context,
-        BlurPageRoute(
-          page: const OnboardingCompletionScreen(),
-        ),
-      );
+      // Final step - save preferences and navigate to completion
+      setState(() => _isLoading = true);
+      
+      try {
+        final prefs = {
+          'TRAVEL_STYLE': [_selectedStyle],
+          'DAILY_PACE': [_selectedPace],
+          'INTERESTS': _selectedInterests.toList(),
+          'AUTOMATION': [_autoPlanning ? 'PLAN EVERYTHING AUTOMATICALLY' : 'SUGGEST, I\'LL DECIDE'],
+        };
+        
+        await PreferenceService.saveMultiplePreferences(prefs);
+      } catch (e) {
+        print('Error saving preferences during onboarding: $e');
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          Navigator.push(
+            context,
+            BlurPageRoute(
+              page: const OnboardingCompletionScreen(),
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -318,8 +338,12 @@ class _Onboarding3ScreenState extends State<Onboarding3Screen>
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _handleContinue,
-                    child: Row(
+                    onPressed: _isLoading ? null : _handleContinue,
+                    child: _isLoading ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    ) : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(

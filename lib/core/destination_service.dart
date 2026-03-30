@@ -48,7 +48,22 @@ class DestinationService {
           .ilike('name', '%$query%')
           .limit(10);
       debugPrint('[DestinationService] Supabase fallback got ${response.length} results');
-      return List<Map<String, dynamic>>.from(response);
+      
+      final results = List<Map<String, dynamic>>.from(response);
+      
+      // Link the best match to search history
+      if (results.isNotEmpty) {
+        try {
+          final userId = session.user.id;
+          await Supabase.instance.client.from('search_history').insert({
+            'user_id': userId,
+            'query': query,
+            'destination_id': results.first['id'],
+          });
+        } catch (_) {}
+      }
+      
+      return results;
     } catch (e) {
       debugPrint('[DestinationService] Supabase fallback error: $e');
       return [];
@@ -239,32 +254,96 @@ class DestinationService {
       return [];
     }
   }
-  /// Fetch the actual recent destinations that were fetched and cached in the DB.
+  /// Fetch the actual recent destinations that were fetched and cached in the DB for THIS user.
   static Future<List<Map<String, dynamic>>> getRecentDestinations() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return [];
+
+    // Try backend history endpoint
     try {
+      final response = await http.get(
+        Uri.parse('$_backendUrl/api/destinations/history?limit=5'),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+    } catch (_) {}
+
+    // Fallback: direct Supabase join via search_history
+    try {
+      final userId = session.user.id;
       final response = await Supabase.instance.client
-          .from('destinations')
-          .select('*')
-          .order('created_at', ascending: false)
-          .limit(5); // Increased limit to 5 for My Atlas section
-      return List<Map<String, dynamic>>.from(response);
-    } catch (_) {
+          .from('search_history')
+          .select('searched_at, destinations!inner(*)')
+          .eq('user_id', userId)
+          .order('searched_at', ascending: false)
+          .limit(5);
+
+      final List<Map<String, dynamic>> results = [];
+      final seenIds = <String>{};
+
+      for (var item in response) {
+        final dest = item['destinations'] as Map<String, dynamic>?;
+        if (dest != null && seenIds.add(dest['id'])) {
+          results.add(dest);
+        }
+      }
+      return results;
+    } catch (e) {
+      debugPrint('DestinationService.getRecentDestinations Fallback Error: $e');
       return [];
     }
   }
 
-  /// Fetch a larger history of all stored destinations.
+  /// Fetch a larger history of all stored destinations for THIS user.
   static Future<List<Map<String, dynamic>>> getAllDestinations() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return [];
+
+    // Try backend history endpoint
     try {
+      final response = await http.get(
+        Uri.parse('$_backendUrl/api/destinations/history?limit=50'),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+    } catch (_) {}
+
+    // Fallback: direct Supabase join via search_history
+    try {
+      final userId = session.user.id;
       final response = await Supabase.instance.client
-          .from('destinations')
-          .select('*')
-          .order('created_at', ascending: false)
+          .from('search_history')
+          .select('searched_at, destinations!inner(*)')
+          .eq('user_id', userId)
+          .order('searched_at', ascending: false)
           .limit(50);
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e, stack) {
-      print('DestinationService.getAllDestinations Error: $e');
-      print(stack);
+
+      final List<Map<String, dynamic>> results = [];
+      final seenIds = <String>{};
+
+      for (var item in response) {
+        final dest = item['destinations'] as Map<String, dynamic>?;
+        if (dest != null && seenIds.add(dest['id'])) {
+          results.add(dest);
+        }
+      }
+      return results;
+    } catch (e) {
+      debugPrint('DestinationService.getAllDestinations Error: $e');
       return [];
     }
   }

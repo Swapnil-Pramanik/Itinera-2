@@ -5,6 +5,8 @@ import '../../core/profile_service.dart';
 import '../auth/login_signup_screen.dart';
 import '../../widgets/blur_page_route.dart';
 import 'edit_profile_screen.dart';
+import 'travel_preferences_screen.dart';
+import '../../core/preference_service.dart';
 
 /// Profile Screen - User profile displaying actual database stats
 class ProfileScreen extends StatefulWidget {
@@ -16,6 +18,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _profileData;
+  Map<String, List<String>> _preferences = {};
   bool _isLoading = true;
 
   @override
@@ -25,10 +28,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final data = await ProfileService.getMyProfile();
+    final results = await Future.wait([
+      ProfileService.getMyProfile(),
+      PreferenceService.getPreferences(),
+    ]);
+
     if (mounted) {
       setState(() {
-        _profileData = data;
+        _profileData = results[0] as Map<String, dynamic>?;
+        _preferences = results[1] as Map<String, List<String>>;
         _isLoading = false;
       });
     }
@@ -45,7 +53,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    final displayName = _profileData?['display_name'] ?? UserService.getDisplayName();
+    final displayName =
+        _profileData?['display_name'] ?? UserService.getDisplayName();
     final email = _profileData?['email'] ?? UserService.getEmail();
 
     return Scaffold(
@@ -145,8 +154,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildSettingsItem(
               icon: Icons.tune,
               title: 'TRAVEL PREFERENCES',
-              subtitle: 'No preferences set', // Pending implementation hooked to user_preferences table
-              onTap: () {},
+              subtitle: _getPreferenceSummary(),
+              bottomWidget: _buildPreferenceChips(),
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TravelPreferencesScreen(),
+                  ),
+                );
+                // If preferences were updated, reload profile
+                if (result == true) {
+                  setState(() => _isLoading = true);
+                  _loadProfile();
+                }
+              },
             ),
 
             const SizedBox(height: 48),
@@ -197,6 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required IconData icon,
     required String title,
     required String subtitle,
+    Widget? bottomWidget,
     VoidCallback? onTap,
   }) {
     return InkWell(
@@ -233,6 +256,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.grey.shade600,
                     ),
                   ),
+                  if (bottomWidget != null) ...[
+                    const SizedBox(height: 8),
+                    bottomWidget,
+                  ],
                 ],
               ),
             ),
@@ -243,6 +270,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPreferenceChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          fontFamily: 'RobotoMono',
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
+
+  String _getPreferenceSummary() {
+    if (_preferences.isEmpty) return 'No preferences set';
+
+    final parts = <String>[];
+    if (_preferences.containsKey('TRAVEL_STYLE')) {
+      parts.add(_preferences['TRAVEL_STYLE']!.first);
+    }
+    if (_preferences.containsKey('DAILY_PACE')) {
+      parts.add(_preferences['DAILY_PACE']!.first);
+    }
+
+    return parts.isEmpty ? 'Tailor your automation' : parts.join(' • ');
+  }
+
+  Widget? _buildPreferenceChips() {
+    final interests = _preferences['INTERESTS'] ?? [];
+    if (interests.isEmpty) return null;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ...interests.take(2).map((e) => _buildPreferenceChip(e)),
+        if (interests.length > 2)
+          _buildPreferenceChip('+${interests.length - 2} MORE'),
+      ],
     );
   }
 }

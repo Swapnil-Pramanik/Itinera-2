@@ -5,6 +5,7 @@ import httpx
 from typing import Optional
 import os
 from core.weather import get_weather_forecast
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -86,9 +87,13 @@ def search_destinations(
     # 3. Save to search_history for the user
     if user_id and q:
         try:
+            # If we have cached results, link the first one as the destination_id
+            best_dest_id = cached[0].get("id") if cached else None
+            
             supabase.table("search_history").insert({
                 "user_id": user_id,
                 "query": q,
+                "destination_id": best_dest_id
             }).execute()
         except Exception:
             pass  # Non-critical
@@ -145,6 +150,55 @@ def get_recent_searches(user_payload: dict = Depends(get_current_user)):
             return unique[:5]
         return []
     except Exception:
+        return []
+
+
+# ──────────────────────────────────────────────
+# 2.5 User's Destination History (My Atlas)
+# ──────────────────────────────────────────────
+
+@router.get("/history")
+def get_user_destination_history(
+    limit: int = Query(20, ge=1, le=100),
+    user_payload: dict = Depends(get_current_user)
+):
+    """Fetch destinations that this specific user has searched for or viewed."""
+    user_id = user_payload.get("sub")
+    supabase = get_supabase()
+
+    try:
+        # Join search_history with destinations
+        # We select destinations where search_history.user_id = current_user
+        response = (
+            supabase.table("search_history")
+            .select("searched_at, destinations!inner(*)")
+            .eq("user_id", user_id)
+            .order("searched_at", desc=True)
+            .limit(limit * 2) # Fetch extra for deduplication
+            .execute()
+        )
+        
+        if hasattr(response, "data"):
+            # Deduplicate by destination ID
+            seen_ids = set()
+            unique_destinations = []
+            
+            for item in response.data:
+                dest = item.get("destinations")
+                if dest and dest.get("id") not in seen_ids:
+                    seen_ids.add(dest["id"])
+                    # Carry over the most recent 'searched_at' for sorting if needed
+                    dest["last_viewed_at"] = item.get("searched_at")
+                    unique_destinations.append(dest)
+                
+                if len(unique_destinations) >= limit:
+                    break
+            
+            return unique_destinations
+            
+        return []
+    except Exception as e:
+        print(f"[History] Error: {e}")
         return []
 
 
@@ -255,6 +309,9 @@ async def get_destination_by_name(
                     supabase.table("destinations").update(update_payload).eq("id", dest["id"]).execute()
                 except Exception as e:
                     print(f"Failed to update cache: {e}")
+            
+            # Record view in history
+            _record_search_history(user_id=user_payload.get("sub"), dest_id=dest["id"], query=name)
                     
             return dest
     except Exception:
@@ -299,6 +356,8 @@ async def get_destination_by_name(
         if hasattr(insert_resp, "data") and len(insert_resp.data) > 0:
             dest = insert_resp.data[0]
             dest["attractions"] = []
+            # Record view in history
+            _record_search_history(user_id=user_payload.get("sub"), dest_id=dest["id"], query=name)
             return dest
     except Exception as e:
         # Might conflict if race condition — try fetching again
@@ -431,6 +490,9 @@ async def get_destination_by_id(
                     supabase.table("destinations").update(update_payload).eq("id", dest["id"]).execute()
                 except Exception:
                     pass
+            
+            # Record view in history
+            _record_search_history(user_id=user_payload.get("sub"), dest_id=dest["id"], query=dest["name"])
                     
             return dest
     except Exception:
@@ -515,3 +577,35 @@ async def _fetch_nominatim_coords(name: str, country: str) -> Optional[dict]:
     except Exception as e:
         print(f"[_fetch_nominatim_coords] error: {e}")
     return None
+
+def _record_search_history(user_id: str, dest_id: str, query: Optional[str] = None):
+    """Record a destination view/search in the user's history."""
+    if not (user_id and dest_id):
+        return
+
+    supabase = get_supabase()
+    try:
+        # Check for recent same destination to avoid spamming
+        five_mins_ago = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
+        
+        existing = (
+            supabase.table("search_history")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("destination_id", dest_id)
+            .gte("searched_at", five_mins_ago)
+            .limit(1)
+            .execute()
+        )
+        
+        if hasattr(existing, "data") and len(existing.data) > 0:
+            # Already recorded in last 5 mins, skip
+            return
+            
+        supabase.table("search_history").insert({
+            "user_id": user_id,
+            "destination_id": dest_id,
+            "query": query or "Viewed details"
+        }).execute()
+    except Exception as e:
+        print(f"[_record_search_history] Error: {e}")
