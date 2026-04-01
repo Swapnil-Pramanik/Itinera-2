@@ -4,7 +4,8 @@ import 'timeline_update_preview_screen.dart';
 
 /// Timeline Editor Screen - Modify activities
 class TimelineEditorScreen extends StatefulWidget {
-  const TimelineEditorScreen({super.key});
+  final String tripId;
+  const TimelineEditorScreen({super.key, required this.tripId});
 
   @override
   State<TimelineEditorScreen> createState() => _TimelineEditorScreenState();
@@ -128,7 +129,14 @@ class _TimelineEditorScreenState extends State<TimelineEditorScreen> {
             text: 'SAVE CHANGES',
             showArrow: false,
             onPressed: () {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TimelineUpdatePreviewScreen()));
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TimelineUpdatePreviewScreen(
+                    tripId: widget.tripId,
+                  ),
+                ),
+              );
             },
           ),
         ),

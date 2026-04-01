@@ -11,6 +11,14 @@ class TripCreate(BaseModel):
     tags: Optional[List[str]] = []
     notes: Optional[str] = None
 
+class TripUpdate(BaseModel):
+    title: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    tags: Optional[List[str]] = None
+    notes: Optional[str] = None
+    status: Optional[str] = None
+
 class TripResponse(BaseModel):
     id: UUID
     user_id: UUID

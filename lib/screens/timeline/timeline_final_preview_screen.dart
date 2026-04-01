@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../widgets/buttons/buttons.dart';
 import '../budget/budget_loading_screen.dart';
+import '../../core/trip_service.dart';
 
 /// Timeline Final Preview Screen - Complete multi-day itinerary view
 class TimelineFinalPreviewScreen extends StatelessWidget {
-  const TimelineFinalPreviewScreen({super.key});
+  final String tripId;
+  final VoidCallback onFinalized;
+
+  const TimelineFinalPreviewScreen({
+    super.key,
+    required this.tripId,
+    required this.onFinalized,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -114,11 +122,19 @@ class TimelineFinalPreviewScreen extends StatelessWidget {
         child: SafeArea(
           child: PrimaryButton(
             text: 'CONFIRM & ESTIMATE BUDGET',
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              // Finalize the trip status in the backend
+              onFinalized(); // Tell the previous screen we're finalized
+              await TripService.updateTrip(tripId, status: 'PLANNED');
+
+              if (context.mounted) {
+                Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const BudgetLoadingScreen()));
+                    builder: (context) => const BudgetLoadingScreen(),
+                  ),
+                );
+              }
             },
           ),
         ),

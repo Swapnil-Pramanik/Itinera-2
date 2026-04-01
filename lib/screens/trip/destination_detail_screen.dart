@@ -103,6 +103,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   num? get _rating => _data?['rating'];
   int? get _reviewCount => _data?['review_count'];
   num? get _dailyCost => _data?['estimated_daily_cost_usd'];
+  num? get _luxuryDailyCost => _data?['metadata']?['luxury_cost_inr'] ?? _data?['metadata']?['luxury_cost_usd'];
   String? get _imageUrl => _data?['image_url'];
   List<Map<String, dynamic>> get _attractions {
     final raw = _data?['attractions'];
@@ -122,7 +123,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     if (_dailyCost != null) {
       final days = _minDays ?? 7;
       final total = (_dailyCost! * days).round();
-      return '\$$total';
+      return '₹$total';
     }
     return '--';
   }
@@ -166,6 +167,385 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
+  }
+
+  void _showBudgetBreakdown() {
+    final avgTotal = (_dailyCost ?? 0) * (_minDays ?? 7);
+    final luxuryTotal = (_luxuryDailyCost ?? 0) * (_minDays ?? 7);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.85),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            border: Border.all(color: Colors.white10),
+          ),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'EXPERIENCE COST',
+                style: TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white60,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Estimates for ${_minDays ?? 7} days',
+                style: const TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 32),
+              _buildCostRow(
+                'Standard Discovery',
+                '₹${avgTotal.round()}',
+                'Covers local transport, mid-range dining, and top attractions.',
+                Icons.travel_explore,
+                Colors.blue,
+              ),
+              const SizedBox(height: 24),
+              _buildCostRow(
+                'Luxury Explorer',
+                _luxuryDailyCost != null ? '₹${luxuryTotal.round()}' : 'Coming Soon',
+                'Covers private transfers, fine dining, and exclusive experiences.',
+                Icons.diamond_outlined,
+                Colors.amber,
+              ),
+              const SizedBox(height: 32),
+              PrimaryButton(
+                text: 'CLOSE',
+                onPressed: () => Navigator.pop(context),
+                showArrow: false,
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAttractionDetail(Map<String, dynamic> attraction) {
+    if (attraction['name'] == '--') return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.85),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            border: Border.all(color: Colors.white10),
+          ),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              if (attraction['image_url'] != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: CachedNetworkImage(
+                    imageUrl: attraction['image_url'],
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      height: 180,
+                      color: Colors.white.withOpacity(0.05),
+                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      (attraction['category'] ?? 'SIGHTSEEING').toUpperCase(),
+                      style: const TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.blueAccent,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                  if (attraction['typical_duration_hours'] != null) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '• ${attraction['typical_duration_hours']} HOURS',
+                      style: TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 10,
+                        color: Colors.white.withOpacity(0.5),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                attraction['name'] ?? 'Unknown Attraction',
+                style: const TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              if (attraction['location_area'] != null)
+                Text(
+                  attraction['location_area'],
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                ),
+              const SizedBox(height: 24),
+              Text(
+                attraction['description'] ?? 'No description available for this location.',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.white.withOpacity(0.8),
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: 32),
+              PrimaryButton(
+                text: 'CLOSE',
+                onPressed: () => Navigator.pop(context),
+                showArrow: false,
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAllAttractions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.9),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border.all(color: Colors.white10),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'EXPLORE ALL HIGHLIGHTS',
+                  style: TextStyle(
+                    fontFamily: 'RobotoMono',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white60,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: _attractions.length,
+                    itemBuilder: (context, index) {
+                      final attr = _attractions[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showAttractionDetail(attr);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: Row(
+                              children: [
+                                  Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: attr['image_url'] != null
+                                        ? CachedNetworkImage(
+                                            imageUrl: attr['image_url'],
+                                            fit: BoxFit.cover,
+                                          )
+                                        : const Icon(Icons.location_on, color: Colors.blueAccent),
+                                  ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        attr['name'] ?? '',
+                                        style: const TextStyle(
+                                          fontFamily: 'RobotoMono',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        attr['category'] ?? 'Sightseeing',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white.withOpacity(0.4),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.2)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCostRow(String title, String amount, String description, IconData icon, Color color) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    amount,
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withOpacity(0.5),
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -440,8 +820,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                       _buildInfoChip(
                         Icons.attach_money,
                         _dailyCost != null
-                            ? '\$${_dailyCost!.round()}/day'
+                            ? 'EST. ₹${(_dailyCost!.round() * (_minDays ?? 7))}'
                             : '--/day',
+                        onTap: _showBudgetBreakdown,
                       ),
                     ],
                   ),
@@ -486,8 +867,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () {},
-                        child: Text(
+                        onPressed: _showAllAttractions,
+                        child: const Text(
                           'See all',
                           style: TextStyle(
                             fontFamily: 'RobotoMono',
@@ -701,12 +1082,22 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                 child: PrimaryButton(
                   text: 'Plan this trip',
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const TimelineSelectorScreen(),
-                      ),
-                    );
+                    final destId = _data?['id'];
+                    if (destId != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TimelineSelectorScreen(
+                            destinationId: destId,
+                            destinationName: _name,
+                          ),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Destination data not fully loaded')),
+                      );
+                    }
                   },
                 ),
               ),
@@ -732,20 +1123,12 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
       final row = Row(
         children: [
           Expanded(
-            child: _buildAttractionCard(
-              toShow[i]['name'] ?? '',
-              toShow[i]['location_area'] ?? '',
-              toShow[i]['image_url'],
-            ),
+            child: _buildAttractionCard(toShow[i]),
           ),
           const SizedBox(width: 12),
           if (i + 1 < toShow.length)
             Expanded(
-              child: _buildAttractionCard(
-                toShow[i + 1]['name'] ?? '',
-                toShow[i + 1]['location_area'] ?? '',
-                toShow[i + 1]['image_url'],
-              ),
+              child: _buildAttractionCard(toShow[i + 1]),
             )
           else
             const Expanded(child: SizedBox()),
@@ -817,7 +1200,11 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     return chip;
   }
 
-  Widget _buildAttractionCard(String title, String location, String? imageUrl) {
+  Widget _buildAttractionCard(Map<String, dynamic> attraction) {
+    final title = attraction['name'] ?? '';
+    final location = attraction['location_area'] ?? '';
+    final imageUrl = attraction['image_url'];
+
     // Generate a beautiful fallback gradient based on title length/hash
     final colors = [
       [Colors.blue.shade800, Colors.purple.shade800],
@@ -827,28 +1214,41 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     ];
     final colorPair = colors[title.length % colors.length];
 
-    return Container(
-      height: 120,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (imageUrl != null && imageUrl.isNotEmpty)
-            CachedNetworkImage(
-              imageUrl: imageUrl,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(color: colorPair[0]),
-              errorWidget: (context, url, error) => Container(
+    return GestureDetector(
+      onTap: () => _showAttractionDetail(attraction),
+      child: Container(
+        height: 120,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (imageUrl != null && imageUrl.isNotEmpty)
+              CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(color: colorPair[0]),
+                errorWidget: (context, url, error) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: colorPair,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+              )
+            else
+              Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: colorPair,
@@ -856,64 +1256,54 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     end: Alignment.bottomRight,
                   ),
                 ),
+                child:
+                    const Icon(Icons.landscape, color: Colors.white24, size: 40),
               ),
-            )
-          else
+            // Gradient overlay for text readability
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: colorPair,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.8),
+                  ],
                 ),
               ),
-              child:
-                  const Icon(Icons.landscape, color: Colors.white24, size: 40),
             ),
-          // Gradient overlay for text readability
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.8),
+            Positioned(
+              left: 12,
+              bottom: 12,
+              right: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    location,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.8),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-          Positioned(
-            left: 12,
-            bottom: 12,
-            right: 12,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'RobotoMono',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    height: 1.2,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  location,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

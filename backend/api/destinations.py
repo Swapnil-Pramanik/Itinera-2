@@ -5,6 +5,7 @@ import httpx
 from typing import Optional
 import os
 from core.weather import get_weather_forecast
+from core.ai import generate_destination_insights
 from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
@@ -310,6 +311,9 @@ async def get_destination_by_name(
                 except Exception as e:
                     print(f"Failed to update cache: {e}")
             
+            # AI Enrichment (Check if missing or older than 30 days)
+            dest = await _enrich_destination_with_ai(dest)
+            
             # Record view in history
             _record_search_history(user_id=user_payload.get("sub"), dest_id=dest["id"], query=name)
                     
@@ -355,7 +359,11 @@ async def get_destination_by_name(
         )
         if hasattr(insert_resp, "data") and len(insert_resp.data) > 0:
             dest = insert_resp.data[0]
-            dest["attractions"] = []
+            
+            # AI Enrichment for NEW destination
+            dest = await _enrich_destination_with_ai(dest)
+            
+            dest["attractions"] = dest.get("attractions", [])
             # Record view in history
             _record_search_history(user_id=user_payload.get("sub"), dest_id=dest["id"], query=name)
             return dest
@@ -452,44 +460,9 @@ async def get_destination_by_id(
         )
         if hasattr(response, "data") and response.data:
             dest = response.data
-            needs_update = False
             
-            # Recovery: Lookup coordinates if missing
-            current_lat = dest.get("latitude")
-            current_lon = dest.get("longitude")
-            if current_lat is None or current_lon is None:
-                coords = await _fetch_nominatim_coords(dest["name"], dest["country"])
-                if coords:
-                    dest["latitude"] = coords["lat"]
-                    dest["longitude"] = coords["lon"]
-                    needs_update = True
-            
-            if not dest.get("image_url"):
-                new_image_url = _fetch_unsplash_image(dest["name"])
-                if new_image_url:
-                    dest["image_url"] = new_image_url
-                    needs_update = True
-                    
-            final_lat = dest.get("latitude")
-            final_lon = dest.get("longitude")
-            if final_lat is not None and final_lon is not None:
-                weather_data = await get_weather_forecast(lat=float(final_lat), lon=float(final_lon))
-                if weather_data:
-                    if dest.get("metadata") is None:
-                        dest["metadata"] = {}
-                    dest["metadata"]["weather"] = weather_data
-                    needs_update = True
-                    
-            if needs_update:
-                try:
-                    update_payload = {}
-                    if "latitude" in dest: update_payload["latitude"] = dest["latitude"]
-                    if "longitude" in dest: update_payload["longitude"] = dest["longitude"]
-                    if "image_url" in dest: update_payload["image_url"] = dest["image_url"]
-                    if "metadata" in dest: update_payload["metadata"] = dest["metadata"]
-                    supabase.table("destinations").update(update_payload).eq("id", dest["id"]).execute()
-                except Exception:
-                    pass
+            # Recovery/Update logic (simplified, delegated to helper)
+            dest = await _enrich_destination_with_ai(dest)
             
             # Record view in history
             _record_search_history(user_id=user_payload.get("sub"), dest_id=dest["id"], query=dest["name"])
@@ -499,6 +472,101 @@ async def get_destination_by_id(
         pass
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Destination not found")
+
+
+async def _enrich_destination_with_ai(dest: dict) -> dict:
+    """Helper to check and trigger AI insights generation (duration, costs, seasonal attractions)."""
+    supabase = get_supabase()
+    metadata = dest.get("metadata") or {}
+    
+    last_updated_str = metadata.get("ai_updated_at")
+    last_gen_month = metadata.get("ai_generated_month")
+    current_month = datetime.now().strftime("%B")
+    
+    needs_ai = False
+    
+    # Check if critical AI fields are missing (including attractions)
+    if not dest.get("estimated_daily_cost_usd") or not dest.get("ideal_duration_min_days") or not dest.get("attractions"):
+        needs_ai = True
+    # Check if we were generated for a DIFFERENT month (seasonal shift)
+    elif last_gen_month != current_month:
+        needs_ai = True
+    # Check for 30-day freshness
+    elif last_updated_str:
+        try:
+            last_updated = datetime.fromisoformat(last_updated_str)
+            if datetime.now() - last_updated > timedelta(days=30):
+                needs_ai = True
+        except Exception:
+            needs_ai = True
+    else:
+        needs_ai = True
+
+    if needs_ai:
+        print(f"[AI] Generating insights for {dest['name']} in {current_month}...")
+        insights = await generate_destination_insights(dest["name"], dest["country"])
+        
+        if insights:
+            # Update base fields
+            update_payload = {
+                "ideal_duration_min_days": insights.get("ideal_duration_min"),
+                "ideal_duration_max_days": insights.get("ideal_duration_max"),
+                "estimated_daily_cost_usd": insights.get("average_daily_cost_inr"),
+                "currency_code": "INR",
+                "best_season": insights.get("best_season"),
+            }
+            
+            # Update metadata with luxury cost, timestamp, and month
+            metadata["ai_updated_at"] = datetime.now().isoformat()
+            metadata["ai_generated_month"] = current_month
+            metadata["luxury_cost_inr"] = insights.get("luxury_daily_cost_inr")
+            update_payload["metadata"] = metadata
+            
+            try:
+                # 1. Update Destinations table
+                supabase.table("destinations").update(update_payload).eq("id", dest["id"]).execute()
+                
+                # 2. Update Attractions table (Seasonal refresh)
+                new_attractions = insights.get("attractions", [])
+                if new_attractions:
+                    # Clear old attractions for this destination
+                    supabase.table("attractions").delete().eq("destination_id", dest["id"]).execute()
+                    
+                    # Insert new attractions
+                    to_insert = []
+                    for attr in new_attractions:
+                        attr_name = attr.get("name")
+                        image_url = None
+                        if attr_name:
+                            # Fetch image for the attraction
+                            image_url = _fetch_unsplash_image(f"{attr_name} {dest['name']}")
+                            
+                        to_insert.append({
+                            "destination_id": dest["id"],
+                            "name": attr_name,
+                            "location_area": attr.get("location_area") or attr.get("category"),
+                            "description": attr.get("description"),
+                            "category": attr.get("category"),
+                            "image_url": image_url,
+                            "typical_duration_hours": attr.get("typical_duration_hours"),
+                            "is_popular": attr.get("is_popular", False)
+                        })
+                    
+                    if to_insert:
+                        print(f"[AI] Inserting {len(to_insert)} attractions with images for {dest['name']}")
+                        supabase.table("attractions").insert(to_insert).execute()
+                        dest["attractions"] = to_insert
+                    else:
+                        print(f"[AI] No attractions generated for {dest['name']}")
+
+                # Update local object
+                dest.update(update_payload)
+                print(f"[AI] Successfully enriched {dest['name']} with budget and attractions.")
+                
+            except Exception as e:
+                print(f"[AI] Failed to save AI insights to DB: {e}")
+                
+    return dest
 
 
 # ──────────────────────────────────────────────

@@ -96,7 +96,7 @@ class DestinationService {
           'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',
         },
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -134,7 +134,7 @@ class DestinationService {
           'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',
         },
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;

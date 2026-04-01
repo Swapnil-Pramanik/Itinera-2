@@ -5,7 +5,8 @@ import 'timeline_final_preview_screen.dart';
 
 /// Timeline Update Preview Screen - Shows updated itinerary after editing
 class TimelineUpdatePreviewScreen extends StatelessWidget {
-  const TimelineUpdatePreviewScreen({super.key});
+  final String tripId;
+  const TimelineUpdatePreviewScreen({super.key, required this.tripId});
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +59,15 @@ class TimelineUpdatePreviewScreen extends StatelessWidget {
           child: PrimaryButton(
             text: 'CONTINUE TO FINAL PREVIEW',
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const TimelineFinalPreviewScreen()));
+              Navigator.push(
+                context, 
+                MaterialPageRoute(
+                  builder: (context) => TimelineFinalPreviewScreen(
+                    tripId: tripId,
+                    onFinalized: () {},
+                  ),
+                ),
+              );
             },
           ),
         ),

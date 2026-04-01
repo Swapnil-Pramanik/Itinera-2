@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../widgets/buttons/buttons.dart';
 import 'timeline_generation_loading_screen.dart';
+import '../../core/trip_service.dart';
 
 /// Timeline Selector Screen - Calendar date picker
 class TimelineSelectorScreen extends StatefulWidget {
-  const TimelineSelectorScreen({super.key});
+  final String destinationId;
+  final String destinationName;
+
+  const TimelineSelectorScreen({
+    super.key,
+    required this.destinationId,
+    required this.destinationName,
+  });
 
   @override
   State<TimelineSelectorScreen> createState() => _TimelineSelectorScreenState();
@@ -60,7 +68,7 @@ class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'We\'ll generate a day-by-day plan for Tokyo, Japan',
+                'We\'ll generate a day-by-day plan for ${widget.destinationName}',
                 style: TextStyle(
                   fontFamily: 'RobotoMono',
                   fontSize: 14,
@@ -140,16 +148,43 @@ class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
                 ),
               ),
               const Spacer(),
-              // Generate button
+               // Generate button
               PrimaryButton(
                 text: 'GENERATE MY ITINERARY',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const TimelineGenerationLoadingScreen(),
+                onPressed: () async {
+                  // Show loading
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
                     ),
                   );
+
+                  // 1. Create the trip record
+                  final trip = await TripService.createTrip(
+                    destinationId: widget.destinationId,
+                    startDate: _startDate,
+                    endDate: _endDate,
+                  );
+
+                  // Hide loading
+                  if (mounted) Navigator.pop(context);
+
+                  if (trip != null && mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TimelineGenerationLoadingScreen(
+                          tripId: trip['id'],
+                        ),
+                      ),
+                    );
+                  } else if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to initialize trip. Please try again.')),
+                    );
+                  }
                 },
               ),
             ],

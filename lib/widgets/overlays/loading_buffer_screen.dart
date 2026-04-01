@@ -22,18 +22,55 @@ class LoadingBufferScreen extends StatefulWidget {
   State<LoadingBufferScreen> createState() => _LoadingBufferScreenState();
 }
 
-class _LoadingBufferScreenState extends State<LoadingBufferScreen> {
+class _LoadingBufferScreenState extends State<LoadingBufferScreen> with TickerProviderStateMixin {
   Map<String, dynamic>? _preloadedData;
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
+  int _currentLabelIndex = 0;
+  final List<String> _loadingLabels = [
+    'CONSULTING LOCAL AI EXPERTS...',
+    'CURATING SEASONAL ATTRACTIONS...',
+    'CALCULATING BUDGET BENCHMARKS...',
+    'OPTIMIZING YOUR TRAVEL ATLAS...',
+    'STITCHING DESTINATION INSIGHTS...',
+  ];
 
   @override
   void initState() {
     super.initState();
+    
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 40), // Typical max AI time
+    );
+
+    _progressAnimation = Tween<double>(begin: 0.0, end: 0.92).animate(
+      CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic),
+    );
+
+    _progressController.forward();
+    _rotateLabels();
     _startLoading();
   }
 
-  Future<void> _startLoading() async {
-    final startTime = DateTime.now();
+  void _rotateLabels() async {
+    while (mounted) {
+      await Future.delayed(const Duration(seconds: 4));
+      if (mounted) {
+        setState(() {
+          _currentLabelIndex = (_currentLabelIndex + 1) % _loadingLabels.length;
+        });
+      }
+    }
+  }
 
+  @override
+  void dispose() {
+    _progressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startLoading() async {
     try {
       // 1. Fetch details in background
       final data = await DestinationService.getDestinationByName(
@@ -44,16 +81,17 @@ class _LoadingBufferScreenState extends State<LoadingBufferScreen> {
       );
 
       _preloadedData = data;
+      
+      // Snap progress to completion
+      if (mounted) {
+        _progressController.animateTo(1.0, duration: const Duration(milliseconds: 500));
+      }
     } catch (e) {
       debugPrint('[LoadingBuffer] Error fetching data: $e');
     }
 
-    // 2. Ensure minimum duration for "Premium Feel" (2.5 seconds)
-    final elapsed = DateTime.now().difference(startTime).inMilliseconds;
-    const minDuration = 2500; 
-    if (elapsed < minDuration) {
-      await Future.delayed(Duration(milliseconds: minDuration - elapsed));
-    }
+    // 2. Minimum wait for cinematic effect AND progress snap
+    await Future.delayed(const Duration(milliseconds: 800));
 
     if (mounted) {
       _transitionToDetails();
@@ -113,15 +151,70 @@ class _LoadingBufferScreenState extends State<LoadingBufferScreen> {
               ),
             ),
             
-            const SizedBox(height: 12),
-            
-            Text(
-              'PREPARING YOUR ATLAS...',
-              style: TextStyle(
-                fontFamily: 'RobotoMono',
-                fontSize: 11,
-                color: Colors.white.withOpacity(0.5),
-                letterSpacing: 1.5,
+            const SizedBox(height: 48),
+
+            // Progress Bar Container
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 50),
+              child: Column(
+                children: [
+                  AnimatedBuilder(
+                    animation: _progressAnimation,
+                    builder: (context, child) {
+                      return Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: _progressAnimation.value,
+                              backgroundColor: Colors.white.withOpacity(0.05),
+                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                              minHeight: 2,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${(_progressAnimation.value * 100).toInt()}%',
+                                style: const TextStyle(
+                                  fontFamily: 'RobotoMono',
+                                  fontSize: 10,
+                                  color: Colors.white38,
+                                ),
+                              ),
+                              Text(
+                                'EST. ${40 - (40 * _progressAnimation.value).toInt()}s REMAINING',
+                                style: const TextStyle(
+                                  fontFamily: 'RobotoMono',
+                                  fontSize: 10,
+                                  color: Colors.white38,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  // Animated Label
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 500),
+                    child: Text(
+                      _loadingLabels[_currentLabelIndex],
+                      key: ValueKey(_currentLabelIndex),
+                      style: TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.5),
+                        letterSpacing: 2,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
