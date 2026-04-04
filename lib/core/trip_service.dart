@@ -52,6 +52,7 @@ class TripService {
     String? title,
     DateTime? startDate,
     DateTime? endDate,
+    String? departureCity,
     List<String>? tags,
     String? notes,
   }) async {
@@ -70,6 +71,7 @@ class TripService {
           'title': title,
           'start_date': startDate?.toIso8601String().split('T')[0],
           'end_date': endDate?.toIso8601String().split('T')[0],
+          'departure_city': departureCity,
           'tags': tags ?? [],
           'notes': notes,
         }),
@@ -82,6 +84,41 @@ class TripService {
       }
     } catch (e) {
       print('[TripService] createTrip error: $e');
+    }
+    return null;
+  }
+
+  /// Fetches Gemini-powered transport estimates between two activity locations.
+  static Future<Map<String, dynamic>?> getTransportEstimate({
+    required String tripId,
+    required String originTitle,
+    required String destinationTitle,
+    required String city,
+    required String country,
+  }) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return null;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_backendUrl/api/trips/$tripId/transport_estimate'),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'origin_title': originTitle,
+          'destination_title': destinationTitle,
+          'city': city,
+          'country': country,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('[TripService] getTransportEstimate error: $e');
     }
     return null;
   }
@@ -147,7 +184,7 @@ class TripService {
   }
 
   /// Triggers the AI itinerary generation for a specific trip.
-  static Future<bool> generateItinerary(String tripId) async {
+  static Future<bool> generateItinerary(String tripId, {String budgetLevel = 'STANDARD'}) async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return false;
 
@@ -158,11 +195,37 @@ class TripService {
           'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',
         },
+        body: jsonEncode({'budget_level': budgetLevel}),
       ).timeout(const Duration(minutes: 2)); // Increased timeout for AI generation
 
       return response.statusCode == 200;
     } catch (e) {
       print('[TripService] generateItinerary error: $e');
+      return false;
+    }
+  }
+
+  /// Regenerates a single specific day of the itinerary.
+  static Future<bool> regenerateDay(String tripId, int dayNumber, {String budgetLevel = 'STANDARD', List<dynamic>? currentActivities}) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_backendUrl/api/trips/$tripId/generate_day/$dayNumber'),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'budget_level': budgetLevel,
+          if (currentActivities != null) 'current_activities': currentActivities,
+        }),
+      ).timeout(const Duration(minutes: 2));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[TripService] regenerateDay error: $e');
       return false;
     }
   }

@@ -7,11 +7,15 @@ import '../../core/trip_service.dart';
 class TimelineSelectorScreen extends StatefulWidget {
   final String destinationId;
   final String destinationName;
+  final double? dailyCost;
+  final double? luxuryDailyCost;
 
   const TimelineSelectorScreen({
     super.key,
     required this.destinationId,
     required this.destinationName,
+    this.dailyCost,
+    this.luxuryDailyCost,
   });
 
   @override
@@ -21,6 +25,14 @@ class TimelineSelectorScreen extends StatefulWidget {
 class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
   DateTime _startDate = DateTime.now().add(const Duration(days: 30));
   DateTime _endDate = DateTime.now().add(const Duration(days: 37));
+  String _selectedBudget = 'STANDARD';
+  final TextEditingController _departureCityController = TextEditingController();
+
+  @override
+  void dispose() {
+    _departureCityController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +101,35 @@ class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
                 ],
               ),
               const SizedBox(height: 24),
+              // Departure city
+              Text(
+                'STARTING FROM',
+                style: TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextField(
+                  controller: _departureCityController,
+                  style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 14),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    hintText: 'e.g. New Delhi, Mumbai...',
+                    hintStyle: TextStyle(fontFamily: 'RobotoMono', fontSize: 14, color: Colors.grey.shade400),
+                    icon: Icon(Icons.flight_takeoff, size: 20, color: Colors.grey.shade600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               // Duration info
               Container(
                 padding: const EdgeInsets.all(16),
@@ -147,6 +188,11 @@ class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
                   ),
                 ),
               ),
+              // Try to calculate budget
+              if (widget.dailyCost != null) ...[
+                const SizedBox(height: 16),
+                _buildBudgetSelector(),
+              ],
               const Spacer(),
                // Generate button
               PrimaryButton(
@@ -166,26 +212,121 @@ class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
                     destinationId: widget.destinationId,
                     startDate: _startDate,
                     endDate: _endDate,
+                    departureCity: _departureCityController.text.trim().isNotEmpty 
+                      ? _departureCityController.text.trim() 
+                      : null,
                   );
 
                   // Hide loading
                   if (mounted) Navigator.pop(context);
 
-                  if (trip != null && mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TimelineGenerationLoadingScreen(
-                          tripId: trip['id'],
+                    if (trip != null && mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TimelineGenerationLoadingScreen(
+                            tripId: trip['id'],
+                            budgetLevel: _selectedBudget,
+                          ),
                         ),
-                      ),
-                    );
-                  } else if (mounted) {
+                      );
+                    } else if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Failed to initialize trip. Please try again.')),
                     );
                   }
                 },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBudgetSelector() {
+    final days = _endDate.difference(_startDate).inDays;
+    final baseDaily = widget.dailyCost ?? 100.0;
+    final luxuryDaily = widget.luxuryDailyCost ?? (baseDaily * 2.5);
+    final comfortDaily = (baseDaily + luxuryDaily) / 2;
+
+    final standardTotal = (baseDaily * days).round();
+    final comfortTotal = (comfortDaily * days).round();
+    final luxuryTotal = (luxuryDaily * days).round();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'BUDGET PREFERENCE',
+          style: TextStyle(
+            fontFamily: 'RobotoMono',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              _buildBudgetOption('STANDARD', '₹$standardTotal', Icons.travel_explore),
+              _buildBudgetOption('COMFORT', '₹$comfortTotal', Icons.local_taxi),
+              _buildBudgetOption('LUXURY', '₹$luxuryTotal', Icons.diamond_outlined),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBudgetOption(String level, String price, IconData icon) {
+    final isSelected = _selectedBudget == level;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedBudget = level;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.black : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : Colors.grey.shade500,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                level,
+                style: TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                price,
+                style: TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? Colors.blueAccent : Colors.grey.shade800,
+                ),
               ),
             ],
           ),

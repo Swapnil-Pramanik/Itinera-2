@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../../widgets/buttons/buttons.dart';
 import '../budget/budget_loading_screen.dart';
 import '../../core/trip_service.dart';
+import 'package:intl/intl.dart';
 
 /// Timeline Final Preview Screen - Complete multi-day itinerary view
-class TimelineFinalPreviewScreen extends StatelessWidget {
+class TimelineFinalPreviewScreen extends StatefulWidget {
   final String tripId;
   final VoidCallback onFinalized;
 
@@ -15,7 +16,65 @@ class TimelineFinalPreviewScreen extends StatelessWidget {
   });
 
   @override
+  State<TimelineFinalPreviewScreen> createState() => _TimelineFinalPreviewScreenState();
+}
+
+class _TimelineFinalPreviewScreenState extends State<TimelineFinalPreviewScreen> {
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _days = [];
+  String _destinationName = "TRIP";
+  String _dateRange = "";
+  int _dayCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    
+    // 1. Fetch itinerary days
+    final days = await TripService.getTripDays(widget.tripId);
+    
+    // 2. Fetch trip details for the header
+    final trips = await TripService.getMyTrips();
+    final currentTrip = trips.firstWhere((t) => t['id'] == widget.tripId, orElse: () => {});
+    
+    final destination = currentTrip['destinations'] ?? {};
+    final name = (destination['name'] ?? "Destination").toString().toUpperCase();
+    final country = (destination['country'] ?? "").toString().toUpperCase();
+    
+    // Format dates
+    String range = "";
+    if (currentTrip['start_date'] != null) {
+      final start = DateTime.parse(currentTrip['start_date']);
+      final end = currentTrip['end_date'] != null ? DateTime.parse(currentTrip['end_date']) : start.add(const Duration(days: 6));
+      final formatter = DateFormat('MMM d');
+      range = "${formatter.format(start).toUpperCase()} - ${formatter.format(end).toUpperCase()} • ${days.length} DAYS";
+    }
+
+    if (mounted) {
+      setState(() {
+        _days = days;
+        _destinationName = "$name, $country";
+        _dateRange = range;
+        _dayCount = days.length;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -43,7 +102,7 @@ class TimelineFinalPreviewScreen extends StatelessWidget {
                 Icon(Icons.check_circle,
                     size: 14, color: Colors.green.shade800),
                 const SizedBox(width: 4),
-                Text('ALL 7 DAYS PLANNED',
+                Text('ALL $_dayCount DAYS PLANNED',
                     style: TextStyle(
                         fontFamily: 'RobotoMono',
                         fontSize: 10,
@@ -53,60 +112,37 @@ class TimelineFinalPreviewScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: _days.isEmpty 
+          ? const Center(child: Text("No itinerary found.")) 
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('TOKYO, JAPAN',
-                style: TextStyle(
+            Text(_destinationName,
+                style: const TextStyle(
                     fontFamily: 'RobotoMono',
                     fontSize: 24,
                     fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            Text('OCT 14 - OCT 21 • 7 Days',
+            Text(_dateRange,
                 style: TextStyle(
                     fontFamily: 'RobotoMono',
                     fontSize: 14,
                     color: Colors.grey.shade600)),
             const SizedBox(height: 24),
             // Day summary cards
-            _buildDayCard(
-                'DAY 1',
-                'Asakusa & Ueno',
-                ['Senso-ji Temple', 'Nakamise Street', 'Ueno Park'],
-                Icons.temple_buddhist),
-            _buildDayCard(
-                'DAY 2',
-                'Shibuya & Harajuku',
-                ['Shibuya Crossing', 'Meiji Shrine', 'Takeshita Street'],
-                Icons.location_city),
-            _buildDayCard(
-                'DAY 3',
-                'Shinjuku & Akihabara',
-                ['Tokyo Metropolitan Bldg', 'Golden Gai', 'Akihabara'],
-                Icons.nightlife),
-            _buildDayCard(
-                'DAY 4',
-                'Odaiba & TeamLab',
-                ['Rainbow Bridge', 'TeamLab Borderless', 'Gundam Statue'],
-                Icons.museum),
-            _buildDayCard('DAY 5', 'Day Trip to Nikko',
-                ['Toshogu Shrine', 'Kegon Falls', 'Lake Chuzenji'], Icons.park),
-            _buildDayCard(
-                'DAY 6',
-                'Ginza & Tsukiji',
-                ['Tsukiji Outer Market', 'Ginza Shopping', 'Kabuki-za Theatre'],
-                Icons.restaurant),
-            _buildDayCard(
-                'DAY 7',
-                'Departure Day',
-                [
-                  'Souvenir Shopping',
-                  'Last-minute sightseeing',
-                  'Airport Transfer'
-                ],
-                Icons.flight),
+            ..._days.map((day) {
+              final List<dynamic> acts = day['activities'] ?? [];
+              final List<String> activityTitles = acts.map((a) => (a['title'] ?? "").toString()).toList();
+              
+              return _buildDayCard(
+                'DAY ${day['day_number']}',
+                day['day_title'] ?? 'Exploring',
+                activityTitles,
+                _getIconForDay(day['day_number']),
+              );
+            }).toList(),
             const SizedBox(height: 24),
           ],
         ),
@@ -124,8 +160,8 @@ class TimelineFinalPreviewScreen extends StatelessWidget {
             text: 'CONFIRM & ESTIMATE BUDGET',
             onPressed: () async {
               // Finalize the trip status in the backend
-              onFinalized(); // Tell the previous screen we're finalized
-              await TripService.updateTrip(tripId, status: 'PLANNED');
+              widget.onFinalized(); // Tell the previous screen we're finalized
+              await TripService.updateTrip(widget.tripId, status: 'PLANNED');
 
               if (context.mounted) {
                 Navigator.push(
@@ -140,6 +176,19 @@ class TimelineFinalPreviewScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  IconData _getIconForDay(int dayNum) {
+    List<IconData> icons = [
+      Icons.temple_buddhist,
+      Icons.location_city,
+      Icons.nightlife,
+      Icons.museum,
+      Icons.park,
+      Icons.restaurant,
+      Icons.flight
+    ];
+    return icons[(dayNum - 1) % icons.length];
   }
 
   Widget _buildDayCard(
@@ -183,7 +232,7 @@ class TimelineFinalPreviewScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(activities.join(' • '),
+                Text(activities.take(3).join(' • '), // Show only top 3 to keep it clean
                     style: TextStyle(
                         fontFamily: 'RobotoMono',
                         fontSize: 12,

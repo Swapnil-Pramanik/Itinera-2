@@ -20,6 +20,10 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
   List<Map<String, dynamic>> _days = [];
   int _selectedDayIndex = 0;
   String _destinationName = "Destination";
+  String _city = "";
+  String _country = "";
+  double _savedTime = 0.0;
+  bool _isRegeneratingDay = false;
 
   @override
   void initState() {
@@ -35,11 +39,14 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
     final trips = await TripService.getMyTrips();
     final currentTrip = trips.firstWhere((t) => t['id'] == widget.tripId, orElse: () => {});
     final destName = currentTrip['destinations']?['name'] ?? "Trip";
+    final destCountry = currentTrip['destinations']?['country'] ?? "";
 
     if (mounted) {
       setState(() {
         _days = days;
         _destinationName = destName.toUpperCase();
+        _city = destName;
+        _country = destCountry;
         _isLoading = false;
       });
     }
@@ -76,7 +83,7 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
           ),
           title: Row(
             children: [
-              const Icon(Icons.send, size: 18, color: Colors.black87),
+              Image.asset('assets/images/logo_black.png', height: 20),
               const SizedBox(width: 8),
               const Text('Itinera', style: TextStyle(fontFamily: 'RobotoMono', fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87)),
             ],
@@ -90,7 +97,7 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
                 children: [
                   Icon(Icons.check, size: 14, color: Colors.green.shade800),
                   const SizedBox(width: 4),
-                  Text('DAY 1 PLANNED', style: TextStyle(fontFamily: 'RobotoMono', fontSize: 10, color: Colors.green.shade800)),
+                  Text('${_days.length} DAYS PLANNED', style: TextStyle(fontFamily: 'RobotoMono', fontSize: 10, color: Colors.green.shade800)),
                 ],
               ),
             ),
@@ -114,7 +121,119 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
                       fontFamily: 'RobotoMono',
                       fontSize: 14,
                       color: Colors.grey.shade600)),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              
+              if (_savedTime != 0) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _savedTime > 0 ? Colors.green.shade50 : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _savedTime > 0 ? Colors.green.shade200 : Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _savedTime > 0 ? Icons.timer_outlined : Icons.warning_amber_rounded, 
+                        color: _savedTime > 0 ? Colors.green.shade700 : Colors.red.shade700
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _savedTime > 0 
+                                ? 'TIME SAVED: ${_savedTime.toStringAsFixed(1)} HOURS' 
+                                : 'OVER SCHEDULED: ${(_savedTime.abs()).toStringAsFixed(1)} HOURS SHORT',
+                              style: TextStyle(
+                                fontFamily: 'RobotoMono',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _savedTime > 0 ? Colors.green.shade800 : Colors.red.shade800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _isRegeneratingDay 
+                                ? 'Regenerating day...' 
+                                : (_savedTime > 0 ? 'Would you like to add something else?' : 'Would you like to re-balance the day?'),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _savedTime > 0 ? Colors.green.shade900 : Colors.red.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_isRegeneratingDay)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        Row(
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _savedTime = 0.0;
+                                });
+                              },
+                              child: Text(
+                                'DISMISS',
+                                style: TextStyle(
+                                  fontFamily: 'RobotoMono',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _savedTime > 0 ? Colors.green.shade800 : Colors.red.shade800,
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                setState(() {
+                                  _isRegeneratingDay = true;
+                                });
+                                final success = await TripService.regenerateDay(
+                                  widget.tripId, 
+                                  _selectedDayIndex + 1,
+                                  currentActivities: activities,
+                                );
+                                if (success) {
+                                  await _loadItinerary();
+                                }
+                                if (mounted) {
+                                  setState(() {
+                                    _isRegeneratingDay = false;
+                                    _savedTime = 0.0;
+                                  });
+                                }
+                              },
+                              style: TextButton.styleFrom(
+                                backgroundColor: _savedTime > 0 ? Colors.green.shade200 : Colors.red.shade200,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: Text(
+                                'YES',
+                                style: TextStyle(
+                                  fontFamily: 'RobotoMono',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: _savedTime > 0 ? Colors.green.shade900 : Colors.red.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+              
               // Day tabs
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -133,9 +252,33 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
               if (activities.isEmpty)
                 const Center(child: Text("No activities planned for this day."))
               else
-                ...activities.map((activity) {
+                ...activities.asMap().entries.map((entry) {
+                  final int actIdx = entry.key;
+                  final activity = entry.value;
                   IconData icon = Icons.explore_outlined;
                   Color iconColor = Colors.grey;
+
+                  if (activity['type'] == 'TRANSPORT') {
+                    // Skip transport before Arrival or Hotel check-in
+                    final nextIdx = actIdx + 1;
+                    if (nextIdx < activities.length) {
+                      final nextTitle = (activities[nextIdx]['title'] ?? '').toString().toLowerCase();
+                      if (nextTitle.contains('arrival') || nextTitle.contains('hotel') || nextTitle.contains('check-in') || nextTitle.contains('check in')) {
+                        return const SizedBox.shrink();
+                      }
+                    }
+                    // Skip if first activity in the day
+                    if (actIdx == 0) {
+                      return const SizedBox.shrink();
+                    }
+                    return TransportConnectorCard(
+                      time: activity['time'] ?? '??',
+                      mode: activity['transport_mode'] ?? 'TRANSIT',
+                      durationHours: (activity['duration_hours'] as num?)?.toDouble() ?? 0.3,
+                      priceDelta: (activity['price_delta'] as num?)?.toDouble(),
+                      currencySymbol: activity['currency_symbol'] ?? '₹',
+                    );
+                  }
 
                   switch (activity['type']) {
                     case 'SIGHTSEEING':
@@ -146,11 +289,11 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
                       icon = Icons.restaurant_outlined;
                       iconColor = Colors.red;
                       break;
-                    case 'TRANSIT':
+                    case 'TRANSPORT':
                       icon = Icons.directions_bus_outlined;
                       iconColor = Colors.blue;
                       break;
-                    case 'BREAK':
+                    case 'RELAXATION':
                       icon = Icons.hotel_outlined;
                       iconColor = Colors.green;
                       break;
@@ -162,8 +305,59 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
                       time: activity['time'] ?? '??',
                       title: activity['title'] ?? 'Activity',
                       subtitle: activity['description'] ?? '',
+                      durationHours: activity['duration_hours'] != null ? (activity['duration_hours'] as num).toDouble() : null,
                       icon: icon,
                       iconColor: iconColor,
+                      onEdit: () async {
+                        // Find previous non-transport activity title
+                        String? prevTitle;
+                        for (int pi = actIdx - 1; pi >= 0; pi--) {
+                          if (activities[pi]['type'] != 'TRANSPORT') {
+                            prevTitle = activities[pi]['title'];
+                            break;
+                          }
+                        }
+                        
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TimelineEditorScreen(
+                              tripId: widget.tripId,
+                              activity: Map<String, dynamic>.from(activity),
+                              previousActivityTitle: prevTitle,
+                              city: _city,
+                              country: _country,
+                            ),
+                          ),
+                        );
+                        
+                        // Handle result from TimelineEditorScreen
+                        if (result != null && result is Map<String, dynamic>) {
+                          if (mounted) {
+                            setState(() {
+                              // Replace the activity internally to mock UI update
+                              final double timeSaved = result['savedTime'] ?? 0.0;
+                              if (timeSaved != 0) {
+                                _savedTime += timeSaved;
+                              }
+                              
+                              final updatedAct = result['activity'];
+                              int idx = activities.indexOf(activity);
+                              if (idx != -1) {
+                                activities[idx] = updatedAct;
+                                
+                                // Sync transport card if it exists before this activity
+                                if (idx > 0 && activities[idx - 1]['type'] == 'TRANSPORT') {
+                                  activities[idx - 1]['transport_mode'] = result['transport_mode'];
+                                  activities[idx - 1]['duration_hours'] = result['transport_duration_hours'];
+                                  activities[idx - 1]['price_delta'] = result['transport_price_delta'];
+                                  activities[idx - 1]['currency_symbol'] = result['currency_symbol'] ?? '₹';
+                                }
+                              }
+                            });
+                          }
+                        }
+                      },
                     ),
                   );
                 }).toList(),
@@ -177,23 +371,6 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
           child: SafeArea(
             child: Row(
               children: [
-                Expanded(
-                  child: SecondaryButton(
-                    text: 'Edit',
-                    icon: Icons.edit_outlined,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TimelineEditorScreen(
-                            tripId: widget.tripId,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: PrimaryButton(
                     text: 'Complete',

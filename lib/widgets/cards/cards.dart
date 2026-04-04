@@ -338,18 +338,22 @@ class ActivityCard extends StatelessWidget {
   final Color? iconColor;
   final bool hasAlert;
   final String? alertText;
+  final double? durationHours;
   final VoidCallback? onTap;
+  final VoidCallback? onEdit;
 
   const ActivityCard({
     super.key,
     required this.time,
     required this.title,
     this.subtitle,
+    this.durationHours,
     this.icon = Icons.place,
     this.iconColor,
     this.hasAlert = false,
     this.alertText,
     this.onTap,
+    this.onEdit,
   });
 
   @override
@@ -441,6 +445,18 @@ class ActivityCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (durationHours != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${durationHours!.toStringAsFixed(1)} hrs',
+                          style: TextStyle(
+                            fontFamily: 'RobotoMono',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: iconColor ?? Colors.blue,
+                          ),
+                        ),
+                      ],
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
                         Text(
@@ -454,6 +470,15 @@ class ActivityCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onEdit != null) ...[
+                  IconButton(
+                    icon: Icon(Icons.edit_outlined, size: 18, color: Colors.grey.shade400),
+                    onPressed: onEdit,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 // Menu
                 Icon(
                   Icons.more_horiz,
@@ -598,6 +623,122 @@ class DaySummaryCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Transport connector card for gapless transitions
+class TransportConnectorCard extends StatelessWidget {
+  final String time;
+  final String mode; // WALK, TRANSIT, TAXI
+  final double durationHours;
+  final double? priceDelta;
+  final String currencySymbol;
+
+  const TransportConnectorCard({
+    super.key,
+    required this.time,
+    required this.mode,
+    required this.durationHours,
+    this.priceDelta,
+    this.currencySymbol = '₹',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    IconData icon;
+    Color iconColor;
+    String label;
+
+    switch (mode) {
+      case 'WALK':
+        icon = Icons.directions_walk;
+        iconColor = Colors.grey.shade600;
+        label = 'Walk';
+        break;
+      case 'TRAIN':
+      case 'TRANSIT':
+        icon = Icons.train_outlined;
+        iconColor = Colors.blue.shade600;
+        label = 'Public Transport';
+        break;
+      case 'TAXI':
+        icon = Icons.local_taxi_outlined;
+        iconColor = Colors.orange.shade700;
+        label = 'Taxi';
+        break;
+      default:
+        icon = Icons.directions_bus_outlined;
+        iconColor = Colors.blue.shade600;
+        label = 'Transport';
+    }
+
+    final durationMin = (durationHours * 60).round();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.shade100.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          // Time
+          SizedBox(
+            width: 50,
+            child: Text(
+              time,
+              style: TextStyle(
+                fontFamily: 'RobotoMono',
+                fontSize: 10,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Connection visual
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 16, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: TextStyle(
+                    fontFamily: 'RobotoMono',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: Colors.blue.shade900.withOpacity(0.8),
+                  ),
+                ),
+                Text(
+                  '$durationMin min${priceDelta != null && priceDelta! != 0 ? ' • $currencySymbol${priceDelta!.abs().toStringAsFixed(0)}' : ''}',
+                  style: TextStyle(
+                    fontFamily: 'RobotoMono',
+                    fontSize: 10,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Right indicator
+          Icon(Icons.unfold_more, size: 16, color: Colors.blue.shade200),
         ],
       ),
     );

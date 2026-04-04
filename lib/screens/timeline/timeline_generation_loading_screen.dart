@@ -5,7 +5,8 @@ import '../../core/trip_service.dart';
 /// Timeline Generation Loading Screen
 class TimelineGenerationLoadingScreen extends StatefulWidget {
   final String tripId;
-  const TimelineGenerationLoadingScreen({super.key, required this.tripId});
+  final String budgetLevel;
+  const TimelineGenerationLoadingScreen({super.key, required this.tripId, this.budgetLevel = 'STANDARD'});
 
   @override
   State<TimelineGenerationLoadingScreen> createState() => _TimelineGenerationLoadingScreenState();
@@ -19,7 +20,7 @@ class _TimelineGenerationLoadingScreenState extends State<TimelineGenerationLoad
   }
 
   Future<void> _startGeneration() async {
-    final success = await TripService.generateItinerary(widget.tripId);
+    final success = await TripService.generateItinerary(widget.tripId, budgetLevel: widget.budgetLevel);
     
     if (!mounted) return;
 

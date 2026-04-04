@@ -2,14 +2,50 @@ import 'package:flutter/material.dart';
 import '../../widgets/buttons/buttons.dart';
 import '../../widgets/cards/cards.dart';
 import 'timeline_final_preview_screen.dart';
+import '../../core/trip_service.dart';
 
 /// Timeline Update Preview Screen - Shows updated itinerary after editing
-class TimelineUpdatePreviewScreen extends StatelessWidget {
+class TimelineUpdatePreviewScreen extends StatefulWidget {
   final String tripId;
   const TimelineUpdatePreviewScreen({super.key, required this.tripId});
 
   @override
+  State<TimelineUpdatePreviewScreen> createState() => _TimelineUpdatePreviewScreenState();
+}
+
+class _TimelineUpdatePreviewScreenState extends State<TimelineUpdatePreviewScreen> {
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _days = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    final days = await TripService.getTripDays(widget.tripId);
+    if (mounted) {
+      setState(() {
+        _days = days;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final firstDay = _days.isNotEmpty ? _days.first : null;
+    final List<dynamic> activities = firstDay?['activities'] ?? [];
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -40,15 +76,21 @@ class TimelineUpdatePreviewScreen extends StatelessWidget {
             const Text('DAY 1 • UPDATED', style: TextStyle(fontFamily: 'RobotoMono', fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1)),
             const SizedBox(height: 16),
             // Updated activities
-            ActivityCard(time: '09:00', title: 'Senso-ji Temple', subtitle: '2.5 hours • Updated', icon: Icons.temple_buddhist, iconColor: Colors.orange),
-            const SizedBox(height: 12),
-            ActivityCard(time: '11:30', title: 'Nakamise Street', subtitle: 'Adjusted for new schedule', icon: Icons.store, iconColor: Colors.blue),
-            const SizedBox(height: 12),
-            ActivityCard(time: '13:30', title: 'Lunch at Asakusa', subtitle: 'New: Traditional Japanese', icon: Icons.restaurant, iconColor: Colors.green),
-            const SizedBox(height: 12),
-            ActivityCard(time: '15:00', title: 'Ueno Park', subtitle: 'Rescheduled', icon: Icons.park, iconColor: Colors.teal),
-            const SizedBox(height: 12),
-            ActivityCard(time: '18:00', title: 'Shibuya Crossing', subtitle: 'Evening visit as planned', icon: Icons.location_city, iconColor: Colors.purple),
+            if (activities.isEmpty)
+              const Center(child: Text("No activities found."))
+            else
+              ...activities.map((act) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ActivityCard(
+                    time: act['time'] ?? '??',
+                    title: act['title'] ?? 'Activity',
+                    subtitle: 'Updated',
+                    icon: _getIconForCategory(act['type'] ?? ''),
+                    iconColor: _getColorForCategory(act['type'] ?? ''),
+                  ),
+                );
+              }).toList(),
             const SizedBox(height: 32),
           ],
         ),
@@ -63,7 +105,7 @@ class TimelineUpdatePreviewScreen extends StatelessWidget {
                 context, 
                 MaterialPageRoute(
                   builder: (context) => TimelineFinalPreviewScreen(
-                    tripId: tripId,
+                    tripId: widget.tripId,
                     onFinalized: () {},
                   ),
                 ),
@@ -73,5 +115,25 @@ class TimelineUpdatePreviewScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  IconData _getIconForCategory(String category) {
+    switch (category) {
+      case 'SIGHTSEEING': return Icons.camera_alt_outlined;
+      case 'DINING': return Icons.restaurant_outlined;
+      case 'TRANSPORT': return Icons.directions_bus_outlined;
+      case 'RELAXATION': return Icons.hotel_outlined;
+      default: return Icons.explore_outlined;
+    }
+  }
+
+  Color _getColorForCategory(String category) {
+    switch (category) {
+      case 'SIGHTSEEING': return Colors.orange;
+      case 'DINING': return Colors.green;
+      case 'TRANSPORT': return Colors.blue;
+      case 'RELAXATION': return Colors.teal;
+      default: return Colors.grey;
+    }
   }
 }

@@ -8,6 +8,7 @@ class TripCreate(BaseModel):
     title: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    departure_city: Optional[str] = None
     tags: Optional[List[str]] = []
     notes: Optional[str] = None
 

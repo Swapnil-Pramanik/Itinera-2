@@ -84,71 +84,284 @@ async def generate_trip_itinerary(
     country: str, 
     days: int, 
     start_date: str, 
-    attractions: list
+    attractions: list,
+    user_preferences: dict = None,
+    weather_data: dict = None,
+    budget_level: str = "STANDARD"
 ) -> Optional[list]:
-    """
-    Generate a day-by-day itinerary for a specific trip.
-    Returns a list of day objects, each with a title and activities.
-    """
+    import os
+    import json
+    from google import genai
+    from google.genai import types
+
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        print("[AI] GEMINI_API_KEY is not set.")
+        return None
+
+    client = genai.Client(api_key=gemini_key)
+    
+    # Process Contexts
+    prefs_str = "None specified"
+    if user_preferences:
+        prefs_list = []
+        for key, values in user_preferences.items():
+            prefs_list.append(f"{key}: {', '.join(values)}")
+        if prefs_list:
+            prefs_str = "; ".join(prefs_list)
+
+    weather_str = "Unknown"
+    if weather_data and "current" in weather_data:
+        temp = weather_data["current"].get("temperature_2m", "--")
+        weather_str = f"{temp}°C based on recent forecasts"
+        
+    attr_str = ", ".join([a['name'] for a in attractions[:7]])
+    
     system_prompt = (
-        "You are a travel planning AI. Create detailed, realistic, and high-quality itineraries. "
-        "Always respond in STRICT JSON format. Do not include any conversational text."
+        "You are an elite travel planner API. Respond solely with a highly realistic, logically ordered JSON array of objects. "
+        f"CRITICAL CONSTRAINT: The JSON array MUST contain exactly {days} elements. If you generate more than {days} elements, the system will crash. "
+        "Each object represents one day of the itinerary."
     )
     
-    # Format attractions for the prompt
-    attr_str = "\n".join([f"- {a['name']} ({a.get('location_area', 'General')})" for a in attractions[:8]])
-    
     user_prompt = f"""
-    Create a {days}-day itinerary for {city}, {country} starting on {start_date}.
+    Create an exact {days}-day realistic human-paced itinerary for {city}, {country} starting on {start_date}.
     
-    Use these top attractions as anchors for the plan:
-    {attr_str}
+    CRITICAL CONSTRAINTS:
+    - EXACTLY {days} DAYS: Your response MUST contain exactly {days} objects in the array. No more, no less. Label them day_number 1 to {days}.
+    - ARRIVAL & DEPARTURE: You MUST include an 'Arrival at {city}' activity as the first activity on Day 1, and a 'Departure from {city}' activity as the last activity on Day {days}.
     
-    Return a JSON ARRAY of objects, one for each day.
-    Each object must have:
-    1. "day_number": (int) 1, 2, 3...
-    2. "day_title": (string) A catchy title for the day's theme.
-    3. "activities": A list of 4-5 objects, each with:
-       - "time": (string, e.g. "09:00 AM", "01:30 PM")
-       - "title": (string)
-       - "location": (string)
-       - "description": (string, 100-150 chars)
-       - "type": (string: "SIGHTSEEING", "DINING", "TRANSIT", "BREAK")
+    CONTEXT:
+    - User Preferences: {prefs_str}. (Focus the theme and activities around these if provided).
+    - Weather Forecast: {weather_str}. (If extremely hot/cold/rainy, favor appropriate indoor/outdoor distribution).
+    - Budget Level: {budget_level}. ("STANDARD" = normal/mid-range, "COMFORT" = upper mid-range/taxis, "LUXURY" = fine dining/private transport).
+    - Key Anchors: Integrate some of these if relevant: {attr_str}.
     
-    Ensure logical flow (e.g., Morning -> Afternoon -> Evening) and include localized dining spots for lunch/dinner.
+    JSON REQUIREMENTS:
+    Return an Array of EXACTLY {days} objects. Do NOT wrap it in any other object, just the array using `[]`.
+    Format per Day Object:
+    {{
+      "day_number": int,
+      "day_title": "string",
+      "activities": [
+        // CONTIGUOUS TIMELINE REQUIRED: Every minute between Day Start and Day End must be accounted for!
+        {{
+          "time": "HH:MM AM/PM",
+          "title": "string",
+          "description": "string",
+          "type": "SIGHTSEEING" | "DINING" | "TRANSPORT" | "RELAXATION",
+          "duration_hours": float,
+          "transport_duration_min": int
+        }}
+      ]
+    }}
+    
+    Ensure logical time flow: Morning -> Afternoon -> Evening. The next activity's `time` MUST closely match the current activity's `time` + `duration_hours`. Provide `TRANSPORT` type activities between venues.
     """
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            payload = {
-                "model": MODEL_NAME,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                "stream": False,
-                "format": "json"
-            }
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                temperature=0.7,
+            )
+        )
+        
+        text = response.text
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
             
-            response = await client.post(OLLAMA_URL, json=payload)
-            
-            if response.status_code == 200:
-                result = response.json()
-                content = result.get("message", {}).get("content", "")
-                
-                # Cleanup potential markdown ticks
-                if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0].strip()
-                elif "```" in content:
-                    content = content.split("```")[1].split("```")[0].strip()
-                
-                parsed = json.loads(content)
-                # Should be a list
-                if isinstance(parsed, dict) and "itinerary" in parsed:
-                    return parsed["itinerary"]
-                return parsed if isinstance(parsed, list) else None
-            else:
-                return None
+        parsed = json.loads(text)
+        
+        if isinstance(parsed, dict) and "itinerary" in parsed:
+            return parsed["itinerary"]
+        if isinstance(parsed, dict) and "days" in parsed:
+            return parsed["days"]
+        return parsed if isinstance(parsed, list) else None
+
     except Exception as e:
-        print(f"[AI] Itinerary error: {e}")
+        print(f"[AI] Gemini Itinerary Generation error: {type(e).__name__}: {e}")
+        return None
+
+async def rebalance_day_itinerary(
+    city: str, 
+    country: str, 
+    date: str, 
+    attractions: list,
+    existing_activities: list,
+    user_preferences: dict = None,
+    budget_level: str = "STANDARD"
+) -> Optional[dict]:
+    import os
+    import json
+    from google import genai
+    from google.genai import types
+
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        print("[AI] GEMINI_API_KEY is not set.")
+        return None
+
+    client = genai.Client(api_key=gemini_key)
+    
+    prefs_str = "None specified"
+    if user_preferences:
+        prefs_list = []
+        for key, values in user_preferences.items():
+            prefs_list.append(f"{key}: {', '.join(values)}")
+        if prefs_list:
+            prefs_str = "; ".join(prefs_list)
+
+    attr_str = ", ".join([a['name'] for a in attractions[:7]])
+    
+    existing_act_str = json.dumps(existing_activities, indent=2)
+
+    system_prompt = (
+        "You are an elite travel planner API. Respond solely with a highly realistic JSON object representing one day. "
+        "Do not over-generate or under-generate the required format."
+    )
+    
+    user_prompt = f"""
+    The user has modified their itinerary for {city}, {country} on {date}, and there is now extra free time.
+    Your goal is to REGENERATE this single day's itinerary by filling the time gaps.
+    
+    CRITICAL CONSTRAINTS:
+    1. KEEP EXISTING ACTIVITIES: Keep existing activities mostly unchanged UNLESS they overlap due to over-scheduling.
+    2. OVER-SCHEDULES: If the user increased an activity's duration and the schedule now overflows (e.g., past bedtime), you MUST explicitly drop less-important activities or shorten them to re-balance the chronological timeline properly.
+    3. DO NOT DELETE ANCHORS: You absolutely must NOT delete "Arrival" and "Departure" activities. Reschedule them if absolutely mandatory, but they must exist.
+    4. FILL THE GAPS: Inject new reasonable activities into any gaps created by shortened activities.
+    
+    Context:
+    - User Preferences: {prefs_str}
+    - Budget Level: {budget_level}
+    
+    Original Activities for this day (reflecting the user's modifications):
+    {existing_act_str}
+    
+    JSON REQUIREMENTS:
+    Return ONE JSON object. Format:
+    {{
+      "day_number": 1,
+      "day_title": "string",
+      "activities": [
+        // CONTIGUOUS TIMELINE REQUIRED: Every minute between Day Start and Day End must be accounted for!
+        {{
+          "time": "HH:MM AM/PM",
+          "title": "string",
+          "description": "string",
+          "type": "SIGHTSEEING" | "DINING" | "TRANSPORT" | "RELAXATION",
+          "duration_hours": float,
+          "transport_duration_min": int
+        }}
+      ]
+    }}
+    
+    Ensure logical time flow: Morning -> Afternoon -> Evening. The next activity's `time` MUST closely match the current activity's `time` + `duration_hours`. Provide `TRANSPORT` type activities between venues.
+    """
+
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                temperature=0.4,
+            )
+        )
+        
+        text = response.text
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
+            
+        parsed = json.loads(text)
+        
+        return parsed
+
+    except Exception as e:
+        print(f"[AI] Gemini Day Rebalance error: {type(e).__name__}: {e}")
+        return None
+
+async def estimate_transport_options(
+    origin: str,
+    destination: str,
+    city: str,
+    country: str,
+) -> Optional[Dict[str, Any]]:
+    """Use Gemini to estimate realistic transport options between two locations."""
+    import os
+    import json
+    from google import genai
+    from google.genai import types
+
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        print("[AI] GEMINI_API_KEY is not set.")
+        return None
+
+    client = genai.Client(api_key=gemini_key)
+
+    system_prompt = (
+        "You are a transport estimation API for travellers. "
+        "Respond solely with valid JSON. Do not add any markdown or text outside JSON."
+    )
+
+    user_prompt = f"""
+    Estimate realistic transport options between two locations in {city}, {country}.
+
+    Origin: {origin}
+    Destination: {destination}
+
+    Return a JSON object with the local currency for {country} and three transport modes:
+    {{
+      "currency": "string (e.g. EUR, JPY, USD) - Do not output INR if the country is not India",
+      "walk": {{
+        "duration_min": int,
+        "price": 0,
+        "price_inr": 0
+      }},
+      "transit": {{
+        "duration_min": int,
+        "price": int (in local currency),
+        "price_inr": int (approximate conversion to Indian Rupees)
+      }},
+      "taxi": {{
+        "duration_min": int,
+        "price": int (in local currency),
+        "price_inr": int (approximate conversion to Indian Rupees)
+      }},
+      "recommended": "walk" | "transit" | "taxi"
+    }}
+
+    Use realistic estimates based on typical distances in {city}. Prices must be in the local currency of {country}. Also provide the approximate equivalent value in INR (Indian Rupee) for convenience.
+    """
+
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                temperature=0.3,
+            )
+        )
+
+        text = response.text
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
+
+        parsed = json.loads(text)
+        return parsed
+
+    except Exception as e:
+        print(f"[AI] Gemini Transport Estimate error: {type(e).__name__}: {e}")
         return None

@@ -1090,6 +1090,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                           builder: (context) => TimelineSelectorScreen(
                             destinationId: destId,
                             destinationName: _name,
+                            dailyCost: _dailyCost?.toDouble(),
+                            luxuryDailyCost: _luxuryDailyCost?.toDouble(),
                           ),
                         ),
                       );
