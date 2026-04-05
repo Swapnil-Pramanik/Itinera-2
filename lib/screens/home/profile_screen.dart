@@ -35,8 +35,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (mounted) {
       setState(() {
-        _profileData = results[0] as Map<String, dynamic>?;
-        _preferences = results[1] as Map<String, List<String>>;
+        final profileRes = results[0];
+        if (profileRes != null) {
+          _profileData = Map<String, dynamic>.from(profileRes as Map);
+        } else {
+          _profileData = null;
+        }
+        final prefsRes = results[1];
+        if (prefsRes is Map) {
+          _preferences = (prefsRes as Map).map((k, v) => MapEntry(k.toString(), List<String>.from(v as Iterable)));
+        }
         _isLoading = false;
       });
     }

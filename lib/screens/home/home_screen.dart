@@ -448,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           final trip = _trips[index];
-          final destination = trip['destinations'] as Map<String, dynamic>?;
+          final destination = (trip['destinations'] as Map?)?.cast<String, dynamic>();
           final name = destination?['name'] ?? trip['title'] ?? 'Trip';
           final country = destination?['country'] ?? '';
           final tags = (destination?['tags'] as List<dynamic>?)

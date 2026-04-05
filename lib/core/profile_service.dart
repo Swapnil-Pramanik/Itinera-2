@@ -23,7 +23,9 @@ class ProfileService {
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final data = jsonDecode(response.body);
+        if (data is Map) return Map<String, dynamic>.from(data);
+        return <String, dynamic>{};
       }
     } catch (_) {
       // Fallback

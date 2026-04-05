@@ -25,7 +25,7 @@ class TripService {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
     } catch (_) {
       // Backend unavailable — fall back to direct Supabase query
@@ -246,7 +246,7 @@ class TripService {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
     } catch (e) {
       print('[TripService] getTripDays error: $e');

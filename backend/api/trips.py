@@ -18,6 +18,7 @@ def get_my_trips(user_payload: dict = Depends(get_current_user)):
             supabase.table("trips")
             .select("*, destinations(name, country, tags, image_url)")
             .eq("user_id", user_id)
+            .neq("status", "DRAFT")
             .order("created_at", desc=True)
             .execute()
         )
@@ -56,7 +57,7 @@ def create_trip(trip: TripCreate, user_payload: dict = Depends(get_current_user)
         "departure_city": trip.departure_city,
         "tags": trip.tags,
         "notes": trip.notes,
-        "status": "PLANNED"
+        "status": "DRAFT"
     }
 
     try:
@@ -277,8 +278,8 @@ async def generate_itinerary(trip_id: str, req: GenerateItineraryRequest, user_p
             if activities_to_insert:
                 supabase.table("activities").insert(activities_to_insert).execute()
             
-        # 4. Update trip status
-        supabase.table("trips").update({"status": "PLANNED"}).eq("id", trip_id).execute()
+        # 4. Update trip status (Keep as DRAFT during generation)
+        supabase.table("trips").update({"status": "DRAFT"}).eq("id", trip_id).execute()
         
         return {"status": "success", "message": f"Successfully generated {len(itinerary)} days"}
 
@@ -516,3 +517,68 @@ async def transport_estimate(trip_id: str, req: TransportEstimateRequest, user_p
             "taxi": {"duration_min": 8, "price": 200, "price_inr": 200},
             "recommended": "transit"
         }
+@router.get("/{trip_id}/budget")
+async def get_trip_budget_breakdown(trip_id: str, user_payload: dict = Depends(get_current_user)):
+    """Fetch deep AI-powered budget breakdown for a specific trip."""
+    user_id = user_payload.get("sub")
+    supabase = get_supabase()
+
+    try:
+        # 1. Fetch trip and destination
+        trip_res = (
+            supabase.table("trips")
+            .select("*, destinations(name, country)")
+            .eq("id", trip_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+        if not (hasattr(trip_res, "data") and trip_res.data):
+            raise HTTPException(status_code=404, detail="Trip not found")
+        
+        trip = trip_res.data
+        dest = trip.get("destinations")
+        
+        # 2. Fetch all activities for budget context
+        activities_res = (
+            supabase.table("timeline_days")
+            .select("activities(title, category)")
+            .eq("trip_id", trip_id)
+            .execute()
+        )
+        
+        all_activities = []
+        if hasattr(activities_res, "data"):
+            for day in activities_res.data:
+                all_activities.extend(day.get("activities", []))
+        
+        # Calculate duration
+        start = datetime.fromisoformat(trip["start_date"]) if trip.get("start_date") else datetime.now()
+        end = datetime.fromisoformat(trip["end_date"]) if trip.get("end_date") else (start + timedelta(days=7))
+        duration = (end - start).days + 1
+
+        # 3. Call AI for deep insights
+        from core.ai import generate_budget_insights
+        budget_data = await generate_budget_insights(
+            city=dest["name"],
+            country=dest["country"],
+            departure_city=trip.get("departure_city") or "New Delhi",
+            duration_days=duration,
+            activities=all_activities
+        )
+        
+        if not budget_data:
+            # Fallback to simple calculation if AI fails
+            avg_daily = 5000 # Default INR
+            return {
+                "currency": "INR",
+                "total_estimated": avg_daily * duration,
+                "is_fallback": True,
+                "message": "AI failed to generate deep breakdown."
+            }
+            
+        return budget_data
+
+    except Exception as e:
+        print(f"[API] Budget breakdown error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

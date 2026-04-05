@@ -31,7 +31,7 @@ class DestinationService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         debugPrint('[DestinationService] Got ${data.length} results from backend');
-        return data.cast<Map<String, dynamic>>();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       } else {
         debugPrint('[DestinationService] Backend error body: ${response.body}');
       }
@@ -99,7 +99,8 @@ class DestinationService {
       ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final data = jsonDecode(response.body);
+        if (data is Map) return Map<String, dynamic>.from(data);
       }
     } catch (_) {
       // Backend unavailable
@@ -137,7 +138,8 @@ class DestinationService {
       ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final data = jsonDecode(response.body);
+        if (data is Map) return Map<String, dynamic>.from(data);
       }
     } catch (_) {}
 
@@ -171,7 +173,8 @@ class DestinationService {
       ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final data = jsonDecode(response.body);
+        if (data is Map) return Map<String, dynamic>.from(data);
       } else {
         debugPrint('[DestinationService] Failed to fetch weather: ${response.statusCode}');
       }
@@ -198,7 +201,7 @@ class DestinationService {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
     } catch (_) {}
 
@@ -271,7 +274,7 @@ class DestinationService {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
     } catch (_) {}
 
@@ -289,9 +292,12 @@ class DestinationService {
       final seenIds = <String>{};
 
       for (var item in response) {
-        final dest = item['destinations'] as Map<String, dynamic>?;
-        if (dest != null && seenIds.add(dest['id'])) {
-          results.add(dest);
+        final destData = item['destinations'];
+        if (destData != null && destData is Map) {
+          final dest = Map<String, dynamic>.from(destData);
+          if (seenIds.add(dest['id'])) {
+            results.add(dest);
+          }
         }
       }
       return results;
@@ -318,7 +324,7 @@ class DestinationService {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
     } catch (_) {}
 
@@ -336,9 +342,12 @@ class DestinationService {
       final seenIds = <String>{};
 
       for (var item in response) {
-        final dest = item['destinations'] as Map<String, dynamic>?;
-        if (dest != null && seenIds.add(dest['id'])) {
-          results.add(dest);
+        final destData = item['destinations'];
+        if (destData != null && destData is Map) {
+          final dest = Map<String, dynamic>.from(destData);
+          if (seenIds.add(dest['id'])) {
+            results.add(dest);
+          }
         }
       }
       return results;

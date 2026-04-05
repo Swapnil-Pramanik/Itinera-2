@@ -1,187 +1,273 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/budget_service.dart';
+import '../../core/trip_service.dart';
 import '../../widgets/buttons/buttons.dart';
 import '../home/home_screen.dart';
 
-/// Budget Estimation Screen - Full budget breakdown
-class BudgetEstimationScreen extends StatelessWidget {
-  const BudgetEstimationScreen({super.key});
+/// Budget Estimation Screen - AI powered deep budget breakdown
+class BudgetEstimationScreen extends StatefulWidget {
+  final String tripId;
+  final Map<String, dynamic>? preloadedBudget;
+  const BudgetEstimationScreen({
+    super.key, 
+    required this.tripId,
+    this.preloadedBudget,
+  });
+
+  @override
+  State<BudgetEstimationScreen> createState() => _BudgetEstimationScreenState();
+}
+
+class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
+  bool _isLoading = true;
+  Map<String, dynamic>? _budgetData;
+  Map<String, dynamic>? _tripData;
+  final ScrollController _scrollController = ScrollController();
+  bool _isCollapsed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.hasClients) {
+        bool isCollapsed = _scrollController.offset > 200;
+        if (isCollapsed != _isCollapsed) {
+          setState(() => _isCollapsed = isCollapsed);
+        }
+      }
+    });
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    
+    // If preloaded budget is available, use it immediately
+    if (widget.preloadedBudget != null) {
+      _budgetData = widget.preloadedBudget;
+    }
+    
+    // Fetch trip data for the header/image
+    final trips = await TripService.getMyTrips();
+    final currentTrip = trips.firstWhere(
+      (t) => t['id'] == widget.tripId, 
+      orElse: () => <String, dynamic>{}
+    );
+    
+    // Only fetch deep budget insights if not pre-fetched
+    final budget = widget.preloadedBudget ?? await BudgetService.getTripBudget(widget.tripId);
+    
+    if (mounted) {
+      setState(() {
+        _tripData = currentTrip;
+        _budgetData = budget;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  String get _title => _tripData?['destinations']?['name'] ?? "Trip";
+  String get _imageUrl => _tripData?['destinations']?['image_url'] ?? "";
+  String get _departureCity => _tripData?['departure_city'] ?? "New Delhi";
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: Colors.black)),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Budget Summary',
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: Colors.white),
+              const SizedBox(height: 24),
+              const Text(
+                'CALCULATING DEEP INSIGHTS...',
                 style: TextStyle(
-                    fontFamily: 'RobotoMono',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black)),
-            Text('Kyoto, Japan',
-                style: TextStyle(
-                    fontFamily: 'RobotoMono',
-                    fontSize: 12,
-                    color: Colors.grey.shade600)),
-          ],
+                  fontFamily: 'RobotoMono',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white60,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Total card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(16)),
-              child: Column(
+      );
+    }
+
+    if (_budgetData == null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(backgroundColor: Colors.transparent, leading: const BackButton(color: Colors.white)),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white54, size: 48),
+              const SizedBox(height: 16),
+              const Text('Failed to load budget insights', style: TextStyle(color: Colors.white70)),
+              TextButton(onPressed: _loadData, child: const Text('RETRY', style: TextStyle(color: Colors.blueAccent))),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final flight = _budgetData!['flight_estimate'] != null ? Map<String, dynamic>.from(_budgetData!['flight_estimate'] as Map) : <String, dynamic>{};
+    final hotels = _budgetData!['hotel_tiers'] != null ? Map<String, dynamic>.from(_budgetData!['hotel_tiers'] as Map) : <String, dynamic>{};
+    final activities = _budgetData!['activity_breakdown'] as List? ?? [];
+    final daily = _budgetData!['daily_expenses'] != null ? Map<String, dynamic>.from(_budgetData!['daily_expenses'] as Map) : <String, dynamic>{};
+    final totalRange = _budgetData!['total_estimated_range'] != null ? Map<String, dynamic>.from(_budgetData!['total_estimated_range'] as Map) : <String, dynamic>{};
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          // Hero Header
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: Colors.black,
+            leading: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+            ),
+            title: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _isCollapsed ? 1.0 : 0.0,
+              child: Text(
+                'BUDGET: $_title',
+                style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Text('TOTAL ESTIMATED',
-                      style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                          letterSpacing: 1)),
-                  const SizedBox(height: 8),
-                  const Text('\$2,450',
-                      style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                              color: Colors.green.shade100,
-                              borderRadius: BorderRadius.circular(12)),
-                          child: Text('WITHIN BUDGET',
-                              style: TextStyle(
-                                  fontFamily: 'RobotoMono',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.green.shade800))),
-                      const SizedBox(width: 8),
-                      Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(12)),
-                          child: const Text('7 DAYS',
-                              style: TextStyle(
-                                  fontFamily: 'RobotoMono',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500))),
-                    ],
+                  if (_imageUrl.isNotEmpty)
+                    CachedNetworkImage(imageUrl: _imageUrl, fit: BoxFit.cover)
+                  else
+                    Container(color: Colors.grey.shade900),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black.withOpacity(0.3), Colors.black],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 40,
+                    left: 20,
+                    right: 20,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'TOTAL ESTIMATED BUDGET',
+                          style: TextStyle(fontFamily: 'RobotoMono', fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white60, letterSpacing: 1),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '₹${totalRange['min_total'] ?? '??'} - ₹${totalRange['max_total'] ?? '??'}',
+                          style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 32, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'For one person, including flights & 4★ stay',
+                          style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5)),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            // Daily breakdown
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('EXPENDITURE BREAKDOWN',
-                    style: TextStyle(
-                        fontFamily: 'RobotoMono',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 1)),
-                TextButton(
-                    onPressed: () {},
-                    child: const Text('EXPORT CSV',
-                        style:
-                            TextStyle(fontFamily: 'RobotoMono', fontSize: 11))),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildDayBreakdown(
-                'Day 1', 'Oct 12 • Arrival & Check-In', '\$1,170', [
-              _ExpenseItem(Icons.flight, 'Flight to KIX (JAL 402)', '\$650'),
-              _ExpenseItem(Icons.hotel, 'Gion Hatanaka (Deposit)', '\$400'),
-              _ExpenseItem(Icons.restaurant, 'Welcome Dinner', '\$120'),
-            ]),
-            _buildDayBreakdown('Day 2', 'Oct 13 • Culture & Food', '\$105', [
-              _ExpenseItem(
-                  Icons.temple_buddhist, 'Fushimi Inari Donation', '\$10'),
-              _ExpenseItem(Icons.restaurant, 'Nishiki Market Lunch', '\$35'),
-              _ExpenseItem(Icons.emoji_food_beverage, 'Tea Ceremony', '\$45'),
-              _ExpenseItem(Icons.train, 'Local Transport', '\$15'),
-            ]),
-            _buildDayBreakdown('Day 3', 'Oct 14 • Arashiyama', '\$240', [
-              _ExpenseItem(Icons.forest, 'Bamboo Grove', 'FREE'),
-              _ExpenseItem(Icons.rowing, 'River Boat Ride', '\$60'),
-              _ExpenseItem(Icons.restaurant, 'Kaiseki Dinner', '\$180'),
-            ]),
-            const SizedBox(height: 24),
-            // Saving tips
-            const Text('SAVING TIPS',
-                style: TextStyle(
-                    fontFamily: 'RobotoMono',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 1)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(12)),
+          ),
+
+          // Content
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    Icon(Icons.auto_awesome,
-                        size: 16, color: Colors.blue.shade700),
-                    const SizedBox(width: 8),
-                    Text('ITINERA RECOMMENDATIONS',
-                        style: TextStyle(
-                            fontFamily: 'RobotoMono',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue.shade700))
-                  ]),
+                  // Flights Section
+                  _buildSectionHeader('ROUND-TRIP FLIGHTS', Icons.flight_takeoff),
                   const SizedBox(height: 12),
-                  _buildTip('1',
-                      'Use the JR Pass for inter-city travel to save approx 20% on bullet trains.'),
-                  _buildTip('2',
-                      'Book the Gion Ryokan early to save 15% on accommodation.'),
-                  _buildTip('3',
-                      'Get a daily bus pass in Kyoto for unlimited rides at \$5/day.'),
+                  _buildFlightCard(flight),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Hotels Section
+                  _buildSectionHeader('ACCOMMODATION OPTIONS', Icons.hotel_outlined),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _buildHotelTierCard('3★', hotels['three_star'])),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildHotelTierCard('4★', hotels['four_star'], highlight: true)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildHotelTierCard('5★', hotels['five_star'])),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 32),
+
+                  // Activities Section
+                  _buildSectionHeader('MAJOR ACTIVITY SPENDING', Icons.explore_outlined),
+                  const SizedBox(height: 12),
+                  ...activities.map((a) => _buildActivityExpenseRow(a)).toList(),
+                  
+                  const SizedBox(height: 32),
+
+                  // Daily Subsistence
+                  _buildSectionHeader('DAILY ESTIMATES', Icons.payments_outlined),
+                  const SizedBox(height: 12),
+                  _buildDailyGrid(daily),
+
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          boxShadow: [
+            BoxShadow(color: Colors.white.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))
+          ],
+        ),
         child: SafeArea(
           child: PrimaryButton(
-            text: 'DONE',
-            icon: Icons.check,
-            showArrow: false,
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-                (route) => false,
-              );
+            text: 'FINALISE & SAVE TRIP',
+            onPressed: () async {
+              // Finalize!
+              await TripService.updateTrip(widget.tripId, status: 'PLANNED');
+              
+              if (mounted) {
+                // Navigate back to Home
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  (route) => false,
+                );
+              }
             },
           ),
         ),
@@ -189,98 +275,152 @@ class BudgetEstimationScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDayBreakdown(
-      String day, String subtitle, String total, List<_ExpenseItem> items) {
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.white38),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white38, letterSpacing: 1),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFlightCard(Map flight) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(day,
-                    style: const TextStyle(
-                        fontFamily: 'RobotoMono',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600)),
-                Text(subtitle,
-                    style: TextStyle(
-                        fontFamily: 'RobotoMono',
-                        fontSize: 11,
-                        color: Colors.grey.shade600))
-              ]),
-              Text(total,
-                  style: const TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('FROM $_departureCity'.toUpperCase(), style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  Text(flight['description'] ?? 'Standard Economy', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4))),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('₹${flight['round_trip_min'] ?? '??'}', style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 18, fontWeight: FontWeight.w700, color: Colors.blueAccent)),
+                  const Text('EST. LOWEST', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white24)),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          ...items.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(children: [
-                  Icon(item.icon, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Text(item.label,
-                          style: TextStyle(
-                              fontFamily: 'RobotoMono',
-                              fontSize: 13,
-                              color: Colors.grey.shade700))),
-                  Text(item.amount,
-                      style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 13,
-                          color: Colors.grey.shade700))
-                ]),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTip(String number, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          const SizedBox(height: 16),
           Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                  color: Colors.blue.shade100,
-                  borderRadius: BorderRadius.circular(10)),
-              child: Center(
-                  child: Text(number,
-                      style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.blue.shade700)))),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(text,
-                  style: TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 12,
-                      color: Colors.blue.shade800,
-                      height: 1.4))),
+            height: 1,
+            color: Colors.white.withOpacity(0.05),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 14, color: Colors.white.withOpacity(0.3)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Subject to seasonal availability. We recommend booking at least 45 days in advance.',
+                  style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.3), fontStyle: FontStyle.italic),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
-}
 
-class _ExpenseItem {
-  final IconData icon;
-  final String label;
-  final String amount;
-  _ExpenseItem(this.icon, this.label, this.amount);
+  Widget _buildHotelTierCard(String tier, dynamic data, {bool highlight = false}) {
+    final perNight = data?['per_night'] ?? '??';
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+      decoration: BoxDecoration(
+        color: highlight ? Colors.blueAccent.withOpacity(0.1) : Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: highlight ? Colors.blueAccent.withOpacity(0.5) : Colors.white10),
+      ),
+      child: Column(
+        children: [
+          Text(tier, style: TextStyle(fontFamily: 'RobotoMono', fontSize: 14, fontWeight: FontWeight.w700, color: highlight ? Colors.blueAccent : Colors.white60)),
+          const SizedBox(height: 12),
+          Text('₹$perNight', style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+          const Text('PER NIGHT', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: Colors.white24, letterSpacing: 0.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityExpenseRow(dynamic activity) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(activity['activity_title'] ?? 'Generic Activity', style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                const SizedBox(height: 2),
+                Text(activity['description'] ?? 'Estimated entrance/fee', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.3))),
+              ],
+            ),
+          ),
+          Text(
+            '₹${activity['estimated_cost'] ?? '0'}',
+            style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyGrid(Map daily) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Expanded(child: _buildDailyItem('FOOD', daily['food_per_day'])),
+            VerticalDivider(color: Colors.white.withOpacity(0.1), width: 40),
+            Expanded(child: _buildDailyItem('TRANSPORT', daily['local_transport_per_day'])),
+            VerticalDivider(color: Colors.white.withOpacity(0.1), width: 40),
+            Expanded(child: _buildDailyItem('OTHER', daily['total_daily_other'])),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDailyItem(String label, dynamic amount) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white24, letterSpacing: 1)),
+        const SizedBox(height: 8),
+        Text('₹${amount ?? '??'}', style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+      ],
+    );
+  }
 }

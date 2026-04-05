@@ -365,3 +365,91 @@ async def estimate_transport_options(
     except Exception as e:
         print(f"[AI] Gemini Transport Estimate error: {type(e).__name__}: {e}")
         return None
+async def generate_budget_insights(
+    city: str,
+    country: str,
+    departure_city: str,
+    duration_days: int,
+    activities: list,
+) -> Optional[Dict[str, Any]]:
+    """Use Gemini to generate a detailed budget breakdown for a trip."""
+    import os
+    import json
+    from google import genai
+    from google.genai import types
+
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        print("[AI] GEMINI_API_KEY is not set.")
+        return None
+
+    client = genai.Client(api_key=gemini_key)
+
+    activities_str = "\n".join([f"- {a.get('title')} ({a.get('category')})" for a in activities[:15]])
+
+    system_prompt = (
+        "You are a travel finance expert API. "
+        "Respond solely with valid JSON. Do not add any markdown or text outside JSON."
+    )
+
+    user_prompt = f"""
+    Provide a detailed realistic budget estimation for a {duration_days}-day trip to {city}, {country} for one person.
+    Departure City: {departure_city}
+
+    Planned Activities:
+    {activities_str}
+
+    Return a JSON object with exactly these keys:
+    {{
+      "currency": "INR",
+      "flight_estimate": {{
+          "round_trip_min": int,
+          "round_trip_max": int,
+          "description": "string (e.g. 'Non-stop flights via Air India/JAL')"
+      }},
+      "hotel_tiers": {{
+          "three_star": {{ "per_night": int, "total": int }},
+          "four_star": {{ "per_night": int, "total": int }},
+          "five_star": {{ "per_night": int, "total": int }}
+      }},
+      "activity_breakdown": [
+          // List up to 5 major spending activities from the provided list
+          {{ "activity_title": "string", "estimated_cost": int, "description": "string" }}
+      ],
+      "daily_expenses": {{
+          "food_per_day": int,
+          "local_transport_per_day": int,
+          "total_daily_other": int
+      }},
+      "total_estimated_range": {{
+          "min_total": int,
+          "max_total": int
+      }}
+    }}
+
+    Use realistic current market rates in Indian Rupees (INR). Ensure the total_estimated_range takes into account flights, 4-star hotels, food, and activities.
+    """
+
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.0-flash', # Use 2.0 Flash for cost efficiency and speed
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                temperature=0.3,
+            )
+        )
+
+        text = response.text
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
+
+        parsed = json.loads(text)
+        return parsed
+
+    except Exception as e:
+        print(f"[AI] Gemini Budget Estimate error: {type(e).__name__}: {e}")
+        return None

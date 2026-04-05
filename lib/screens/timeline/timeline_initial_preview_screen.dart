@@ -335,23 +335,42 @@ class _TimelineInitialPreviewScreenState extends State<TimelineInitialPreviewScr
                         if (result != null && result is Map<String, dynamic>) {
                           if (mounted) {
                             setState(() {
-                              // Replace the activity internally to mock UI update
-                              final double timeSaved = result['savedTime'] ?? 0.0;
-                              if (timeSaved != 0) {
-                                _savedTime += timeSaved;
-                              }
-                              
-                              final updatedAct = result['activity'];
-                              int idx = activities.indexOf(activity);
-                              if (idx != -1) {
-                                activities[idx] = updatedAct;
+                              if (result['deleted'] == true) {
+                                final double timeSaved = result['savedTime'] ?? 0.0;
+                                if (timeSaved != 0) {
+                                  _savedTime += timeSaved;
+                                }
                                 
-                                // Sync transport card if it exists before this activity
-                                if (idx > 0 && activities[idx - 1]['type'] == 'TRANSPORT') {
-                                  activities[idx - 1]['transport_mode'] = result['transport_mode'];
-                                  activities[idx - 1]['duration_hours'] = result['transport_duration_hours'];
-                                  activities[idx - 1]['price_delta'] = result['transport_price_delta'];
-                                  activities[idx - 1]['currency_symbol'] = result['currency_symbol'] ?? '₹';
+                                int idx = activities.indexOf(activity);
+                                if (idx != -1) {
+                                  // Clean up transport block before this activity
+                                  if (idx > 0 && activities[idx - 1]['type'] == 'TRANSPORT') {
+                                    final double transportHours = (activities[idx - 1]['duration_hours'] as num?)?.toDouble() ?? 0.0;
+                                    _savedTime += transportHours;
+                                    activities.removeAt(idx - 1);
+                                    idx--; // Adjust index backwards
+                                  }
+                                  activities.removeAt(idx);
+                                }
+                              } else {
+                                // Replace the activity internally to mock UI update
+                                final double timeSaved = result['savedTime'] ?? 0.0;
+                                if (timeSaved != 0) {
+                                  _savedTime += timeSaved;
+                                }
+                                
+                                final updatedAct = result['activity'];
+                                int idx = activities.indexOf(activity);
+                                if (idx != -1) {
+                                  activities[idx] = updatedAct;
+                                  
+                                  // Sync transport card if it exists before this activity
+                                  if (idx > 0 && activities[idx - 1]['type'] == 'TRANSPORT') {
+                                    activities[idx - 1]['transport_mode'] = result['transport_mode'];
+                                    activities[idx - 1]['duration_hours'] = result['transport_duration_hours'];
+                                    activities[idx - 1]['price_delta'] = result['transport_price_delta'];
+                                    activities[idx - 1]['currency_symbol'] = result['currency_symbol'] ?? '₹';
+                                  }
                                 }
                               }
                             });

@@ -205,39 +205,73 @@ class _TimelineEditorScreenState extends State<TimelineEditorScreen> {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
         child: SafeArea(
-          child: PrimaryButton(
-            text: 'SAVE CHANGES',
-            showArrow: false,
-            onPressed: () {
-              final double savedTime = _originalDuration - _duration;
-              final Map<String, dynamic> updatedActivity = Map.from(widget.activity);
-              updatedActivity['title'] = _activityTitle;
-              updatedActivity['time'] = _time;
-              updatedActivity['type'] = _category;
-              updatedActivity['duration_hours'] = _duration;
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PrimaryButton(
+                text: 'SAVE CHANGES',
+                showArrow: false,
+                onPressed: () {
+                  final double savedTime = _originalDuration - _duration;
+                  final Map<String, dynamic> updatedActivity = Map.from(widget.activity);
+                  updatedActivity['title'] = _activityTitle;
+                  updatedActivity['time'] = _time;
+                  updatedActivity['type'] = _category;
+                  updatedActivity['duration_hours'] = _duration;
 
-              // Get selected transport stats
-              double newTransportHours = 0.33;
-              double priceDelta = 0;
-              
-              if (_transportEstimate != null) {
-                final modeKey = _transportMode.toLowerCase();
-                final modeData = _transportEstimate![modeKey];
-                if (modeData != null) {
-                  newTransportHours = (modeData['duration_min'] ?? 20) / 60.0;
-                  priceDelta = (modeData['price'] ?? 0).toDouble();
-                }
-              }
-              
-              Navigator.pop(context, {
-                'savedTime': savedTime,
-                'activity': updatedActivity,
-                'transport_mode': _transportMode,
-                'transport_duration_hours': newTransportHours,
-                'transport_price_delta': priceDelta,
-                'currency_symbol': _currency,
-              });
-            },
+                  // Get selected transport stats
+                  double newTransportHours = 0.33;
+                  double priceDelta = 0;
+                  
+                  if (_transportEstimate != null) {
+                    final modeKey = _transportMode.toLowerCase();
+                    final modeData = _transportEstimate![modeKey];
+                    if (modeData != null) {
+                      newTransportHours = (modeData['duration_min'] ?? 20) / 60.0;
+                      priceDelta = (modeData['price'] ?? 0).toDouble();
+                    }
+                  }
+                  
+                  Navigator.pop(context, <String, dynamic>{
+                    'savedTime': savedTime,
+                    'activity': updatedActivity,
+                    'transport_mode': _transportMode,
+                    'transport_duration_hours': newTransportHours,
+                    'transport_price_delta': priceDelta,
+                    'currency_symbol': _currency,
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(context, <String, dynamic>{
+                      'deleted': true,
+                      'savedTime': _originalDuration,
+                      'activity': widget.activity,
+                    });
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: Colors.red.withOpacity(0.3)),
+                    ),
+                  ),
+                  child: const Text(
+                    'DELETE THIS ACTIVITY', 
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono', 
+                      fontSize: 12, 
+                      fontWeight: FontWeight.w700, 
+                      color: Colors.red
+                    )
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

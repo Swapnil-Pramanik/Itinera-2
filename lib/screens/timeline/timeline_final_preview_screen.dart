@@ -157,17 +157,16 @@ class _TimelineFinalPreviewScreenState extends State<TimelineFinalPreviewScreen>
         ]),
         child: SafeArea(
           child: PrimaryButton(
-            text: 'CONFIRM & ESTIMATE BUDGET',
-            onPressed: () async {
-              // Finalize the trip status in the backend
-              widget.onFinalized(); // Tell the previous screen we're finalized
-              await TripService.updateTrip(widget.tripId, status: 'PLANNED');
+            text: 'CONTINUE TO BUDGET',
+            onPressed: () {
+              // We no longer finalize here. Finalization happens on the Budget page.
+              widget.onFinalized(); // Tell parent we're progressing
 
               if (context.mounted) {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const BudgetLoadingScreen(),
+                    builder: (context) => BudgetLoadingScreen(tripId: widget.tripId),
                   ),
                 );
               }
