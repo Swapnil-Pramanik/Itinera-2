@@ -19,7 +19,7 @@ class BudgetService {
           'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',
         },
-      ).timeout(const Duration(seconds: 150));
+      ).timeout(const Duration(seconds: 300));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

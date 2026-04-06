@@ -74,7 +74,8 @@ class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
     super.dispose();
   }
 
-  String get _title => _tripData?['destinations']?['name'] ?? "Trip";
+  String get _title => _tripData?['destinations']?['name'] ?? _tripData?['title'] ?? "Your Trip";
+  String get _country => _tripData?['destinations']?['country'] ?? "";
   String get _imageUrl => _tripData?['destinations']?['image_url'] ?? "";
   String get _departureCity => _tripData?['departure_city'] ?? "New Delhi";
 
@@ -87,10 +88,10 @@ class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(color: Colors.white),
+              const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
               const SizedBox(height: 24),
               const Text(
-                'CALCULATING DEEP INSIGHTS...',
+                'COLLECTING BUDGET DATA',
                 style: TextStyle(
                   fontFamily: 'RobotoMono',
                   fontSize: 12,
@@ -116,7 +117,7 @@ class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
               const Icon(Icons.error_outline, color: Colors.white54, size: 48),
               const SizedBox(height: 16),
               const Text('Failed to load budget insights', style: TextStyle(color: Colors.white70)),
-              TextButton(onPressed: _loadData, child: const Text('RETRY', style: TextStyle(color: Colors.blueAccent))),
+              TextButton(onPressed: _loadData, child: const Text('RETRY', style: TextStyle(color: Colors.white))),
             ],
           ),
         ),
@@ -134,61 +135,105 @@ class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // Hero Header
+          // Hero Header with Destination Image
           SliverAppBar(
-            expandedHeight: 280,
+            expandedHeight: 320,
             pinned: true,
+            stretch: true,
             backgroundColor: Colors.black,
-            leading: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-            ),
-            title: AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity: _isCollapsed ? 1.0 : 0.0,
-              child: Text(
-                'BUDGET: $_title',
-                style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CircleAvatar(
+                backgroundColor: Colors.black26,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                ),
               ),
             ),
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
+                  // Hero Image
                   if (_imageUrl.isNotEmpty)
-                    CachedNetworkImage(imageUrl: _imageUrl, fit: BoxFit.cover)
+                    CachedNetworkImage(
+                      imageUrl: _imageUrl, 
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(color: Colors.grey.shade900),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey.shade900,
+                        child: const Icon(Icons.landscape, color: Colors.white10, size: 64),
+                      ),
+                    )
                   else
-                    Container(color: Colors.grey.shade900),
+                    Container(
+                      color: Colors.grey.shade900,
+                      child: const Center(child: Icon(Icons.landscape, color: Colors.white10, size: 64)),
+                    ),
+                  
+                  // Cinematic Gradient
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withOpacity(0.3), Colors.black],
-                        stops: const [0.0, 0.5, 1.0],
+                        colors: [
+                          Colors.black.withOpacity(0.4),
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.8),
+                          Colors.black,
+                        ],
+                        stops: const [0.0, 0.4, 0.8, 1.0],
                       ),
                     ),
                   ),
+
+                  // Header Content
                   Positioned(
-                    bottom: 40,
+                    bottom: 30,
                     left: 20,
                     right: 20,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'TOTAL ESTIMATED BUDGET',
-                          style: TextStyle(fontFamily: 'RobotoMono', fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white60, letterSpacing: 1),
-                        ),
-                        const SizedBox(height: 8),
                         Text(
-                          '₹${totalRange['min_total'] ?? '??'} - ₹${totalRange['max_total'] ?? '??'}',
-                          style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 32, fontWeight: FontWeight.w700, color: Colors.white),
+                          _country.toUpperCase(),
+                          style: TextStyle(
+                            fontFamily: 'RobotoMono',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withOpacity(0.5),
+                            letterSpacing: 2,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'For one person, including flights & 4★ stay',
-                          style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5)),
+                          _title,
+                          style: const TextStyle(
+                            fontFamily: 'RobotoMono',
+                            fontSize: 36,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            'EST. ₹${totalRange['min_total'] ?? '??'} - ₹${totalRange['max_total'] ?? '??'}',
+                            style: const TextStyle(
+                              fontFamily: 'RobotoMono',
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -302,14 +347,20 @@ class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('FROM $_departureCity'.toUpperCase(), style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                  const SizedBox(height: 4),
-                  Text(flight['description'] ?? 'Standard Economy', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4))),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('FROM $_departureCity'.toUpperCase(), style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                    const SizedBox(height: 4),
+                    Text(
+                      flight['description'] ?? 'Standard Economy',
+                      style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4), height: 1.4),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -353,9 +404,12 @@ class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
       ),
       child: Column(
         children: [
-          Text(tier, style: TextStyle(fontFamily: 'RobotoMono', fontSize: 14, fontWeight: FontWeight.w700, color: highlight ? Colors.blueAccent : Colors.white60)),
+          Text(tier, style: TextStyle(fontFamily: 'RobotoMono', fontSize: 12, fontWeight: FontWeight.w700, color: highlight ? Colors.blueAccent : Colors.white60)),
           const SizedBox(height: 12),
-          Text('₹$perNight', style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text('₹$perNight', style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
           const Text('PER NIGHT', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: Colors.white24, letterSpacing: 0.5)),
         ],
       ),
@@ -377,8 +431,11 @@ class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(activity['activity_title'] ?? 'Generic Activity', style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
-                const SizedBox(height: 2),
-                Text(activity['description'] ?? 'Estimated entrance/fee', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.3))),
+                const SizedBox(height: 4),
+                Text(
+                  activity['description'] ?? 'Estimated entrance/fee',
+                  style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.3), height: 1.4),
+                ),
               ],
             ),
           ),

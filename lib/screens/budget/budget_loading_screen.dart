@@ -33,7 +33,7 @@ class _BudgetLoadingScreenState extends State<BudgetLoadingScreen> with TickerPr
     
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 120), // Support long AI processing
+      duration: const Duration(seconds: 240), // Support very long AI processing
     );
 
     _progressAnimation = Tween<double>(begin: 0.0, end: 0.95).animate(
@@ -74,6 +74,17 @@ class _BudgetLoadingScreenState extends State<BudgetLoadingScreen> with TickerPr
     await Future.delayed(const Duration(milliseconds: 1000));
 
     if (mounted) {
+      if (_preloadedBudget == null) {
+        // Show an error instead of transitioning to an empty screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Budget calculation took too long or failed. Retrying...'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        // Maybe go back or show a retry button? 
+        // For now, let's still transition but the backend fallback will now handle it.
+      }
       _transitionToDetails();
     }
   }

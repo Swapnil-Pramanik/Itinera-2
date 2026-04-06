@@ -160,7 +160,7 @@ async def generate_trip_itinerary(
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-flash-latest',
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -265,7 +265,7 @@ async def rebalance_day_itinerary(
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-flash-latest',
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -344,7 +344,7 @@ async def estimate_transport_options(
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-flash-latest',
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -432,7 +432,7 @@ async def generate_budget_insights(
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash', # Use 2.0 Flash for cost efficiency and speed
+            model='gemini-flash-latest', 
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,

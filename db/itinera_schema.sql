@@ -19,7 +19,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE trip_status AS ENUM ('PLANNED', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED');
+    CREATE TYPE trip_status AS ENUM ('DRAFT', 'PLANNED', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED');
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
@@ -167,6 +167,7 @@ CREATE TABLE IF NOT EXISTS trips (
     places_visited INTEGER DEFAULT 0, -- Updated on completion
     activities_done INTEGER DEFAULT 0, -- Updated on completion
     notes TEXT,
+    departure_city VARCHAR(100), -- Origin city for the trip
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)

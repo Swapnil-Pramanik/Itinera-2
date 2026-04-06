@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Trip card for horizontal scrolling in home screen
 class TripCard extends StatelessWidget {
   final String destination;
   final String country;
   final List<String> tags;
+  final String? imageUrl;
+  final String? statusLabel;
   final VoidCallback? onTap;
 
   const TripCard({
@@ -12,89 +16,198 @@ class TripCard extends StatelessWidget {
     required this.destination,
     required this.country,
     this.tags = const [],
+    this.imageUrl,
+    this.statusLabel,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bool isOngoing = statusLabel?.toUpperCase() == "ONGOING";
+    final String displayStatus = statusLabel?.toUpperCase() ?? "UPCOMING";
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 180,
-        height: 140,
+        width: 240,
+        height: 180,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: Stack(
-          children: [
-            // Map placeholder background
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background Image
+              if (imageUrl != null && imageUrl!.isNotEmpty)
+                CachedNetworkImage(
+                  imageUrl: imageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(color: Colors.grey.shade200),
+                  errorWidget: (context, url, error) => _buildFallbackMap(),
+                )
+              else
+                _buildFallbackMap(),
+
+              // Cinematic Gradient Overlay
+              Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                ),
-                child: CustomPaint(
-                  size: const Size(180, 140),
-                  painter: _MapPatternPainter(),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.0),
+                      Colors.black.withOpacity(0.4),
+                      Colors.black.withOpacity(0.85),
+                    ],
+                    stops: const [0.0, 0.4, 0.7, 1.0],
+                  ),
                 ),
               ),
-            ),
-            // Content overlay
-            Positioned(
-              left: 12,
-              bottom: 12,
-              right: 12,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$destination, $country',
-                    style: const TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+
+              // Top Left Status Chip (Glassmorphism)
+              Positioned(
+                top: 14,
+                left: 14,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isOngoing 
+                            ? Colors.blueAccent.withOpacity(0.8) 
+                            : Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isOngoing 
+                              ? Colors.blueAccent.withOpacity(0.4) 
+                              : Colors.white.withOpacity(0.1),
+                        ),
+                        boxShadow: isOngoing ? [
+                          BoxShadow(
+                            color: Colors.blueAccent.withOpacity(0.3),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          )
+                        ] : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isOngoing) ...[
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            displayStatus,
+                            style: const TextStyle(
+                              fontFamily: 'RobotoMono',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    children: tags.map((tag) => _buildTag(tag)).toList(),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+
+              // Bottom Content
+              Positioned(
+                left: 20,
+                bottom: 20,
+                right: 20,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      destination,
+                      style: const TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    Text(
+                      country.toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.6),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    if (tags.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: tags.take(2).map((tag) => _buildGlassTag(tag)).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTag(String tag) {
+  Widget _buildGlassTag(String tag) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         tag,
         style: const TextStyle(
           fontFamily: 'RobotoMono',
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-          color: Colors.black54,
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
         ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackMap() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+      ),
+      child: CustomPaint(
+        size: const Size(240, 180),
+        painter: _MapPatternPainter(),
       ),
     );
   }

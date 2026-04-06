@@ -572,9 +572,30 @@ async def get_trip_budget_breakdown(trip_id: str, user_payload: dict = Depends(g
             avg_daily = 5000 # Default INR
             return {
                 "currency": "INR",
-                "total_estimated": avg_daily * duration,
                 "is_fallback": True,
-                "message": "AI failed to generate deep breakdown."
+                "message": "AI failed to generate deep breakdown.",
+                "flight_estimate": {
+                    "round_trip_min": 15000,
+                    "round_trip_max": 45000,
+                    "description": "Estimated economy flights (Direct/1-stop)"
+                },
+                "hotel_tiers": {
+                    "three_star": { "per_night": 3500, "total": 3500 * duration },
+                    "four_star": { "per_night": 7500, "total": 7500 * duration },
+                    "five_star": { "per_night": 15000, "total": 15000 * duration }
+                },
+                "activity_breakdown": [
+                    { "activity_title": "Sightseeing & Entry Fees", "estimated_cost": 2000 * duration, "description": "General estimate for top attractions" }
+                ],
+                "daily_expenses": {
+                    "food_per_day": 2500,
+                    "local_transport_per_day": 1000,
+                    "total_daily_other": 1000
+                },
+                "total_estimated_range": {
+                    "min_total": (15000 + (7500 + 2500 + 1000 + 1000) * duration),
+                    "max_total": (45000 + (10000 + 4000 + 2000 + 2000) * duration)
+                }
             }
             
         return budget_data

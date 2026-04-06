@@ -47,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _trips = trips;
+          _sortTrips();
           _isLoadingTrips = false;
         });
       }
@@ -57,6 +58,40 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  void _sortTrips() {
+    _trips.sort((a, b) {
+      final aDate = DateTime.tryParse(a['start_date'] ?? '');
+      final bDate = DateTime.tryParse(b['start_date'] ?? '');
+      
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      
+      return aDate.compareTo(bDate);
+    });
+  }
+
+  String _calculateTripStatus(String? start, String? end) {
+    if (start == null || start.isEmpty) return "PLANNING";
+    
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startDate = DateTime.tryParse(start);
+    final endDate = end != null ? DateTime.tryParse(end) : null;
+    
+    if (startDate == null) return "PLANNING";
+    
+    if (today.isBefore(startDate)) {
+      return "UPCOMING";
+    }
+    
+    if (endDate != null && today.isAfter(endDate)) {
+      return "PAST";
+    }
+    
+    return "ONGOING";
   }
 
   Future<void> _loadAtlasArticles() async {
@@ -441,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Dynamic trip cards from fetched data
     return SizedBox(
-      height: 150,
+      height: 220,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _trips.length,
@@ -459,10 +494,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   .toList() ??
               [];
 
+          final imageUrl = destination?['image_url'];
+          final status = _calculateTripStatus(trip['start_date'], trip['end_date']);
+
           return TripCard(
             destination: name,
             country: country,
             tags: tags,
+            imageUrl: imageUrl,
+            statusLabel: status,
             onTap: () {
               Navigator.push(
                 context,
