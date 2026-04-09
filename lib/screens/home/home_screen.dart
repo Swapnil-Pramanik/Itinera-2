@@ -13,6 +13,7 @@ import '../../widgets/overlays/loading_buffer_screen.dart';
 import 'my_atlas_bottom_sheet.dart';
 import 'profile_screen.dart';
 import 'search_bottom_sheet.dart';
+import 'notifications_bottom_sheet.dart';
 
 /// Home Screen - Main dashboard with trips and atlas
 class HomeScreen extends StatefulWidget {
@@ -120,6 +121,14 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: HomeAppBar(
         temperature: '--',
+        onNotificationsTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => const NotificationsBottomSheet(),
+          );
+        },
         onMenuTap: () {
           Navigator.push(
             context,

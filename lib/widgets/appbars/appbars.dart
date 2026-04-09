@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 /// Home screen app bar with logo, weather, and menu
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onMenuTap;
+  final VoidCallback? onNotificationsTap;
   final String? temperature;
 
   const HomeAppBar({
     super.key,
     this.onMenuTap,
+    this.onNotificationsTap,
     this.temperature,
   });
 
@@ -50,6 +52,41 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        GestureDetector(
+          onTap: onNotificationsTap,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(
+                  Icons.notifications_none_outlined,
+                  size: 20,
+                  color: Colors.black87,
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF5252),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         GestureDetector(
           onTap: onMenuTap,
           child: Container(

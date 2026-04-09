@@ -1,8 +1,10 @@
 import httpx
 import json
 import asyncio
+import os
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL_NAME = "gemma3:4b"
@@ -79,6 +81,26 @@ async def generate_destination_insights(name: str, country: str) -> Optional[Dic
     except Exception as e:
         print(f"[AI] Error generating insights: {e}")
         return None
+
+def _parse_ai_json(text: str) -> Any:
+    """Robustly parse JSON from AI response, handling markdown blocks."""
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0].strip()
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0].strip()
+    
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        print(f"[AI] JSON Decode Error: {e}. Raw text: {text[:200]}...")
+        raise
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((Exception)), # Catch broad for Gemini SDK errors
+    reraise=True
+)
 async def generate_trip_itinerary(
     city: str, 
     country: str, 
@@ -89,8 +111,6 @@ async def generate_trip_itinerary(
     weather_data: dict = None,
     budget_level: str = "STANDARD"
 ) -> Optional[list]:
-    import os
-    import json
     from google import genai
     from google.genai import types
 
@@ -169,13 +189,7 @@ async def generate_trip_itinerary(
             )
         )
         
-        text = response.text
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-            
-        parsed = json.loads(text)
+        parsed = _parse_ai_json(response.text)
         
         if isinstance(parsed, dict) and "itinerary" in parsed:
             return parsed["itinerary"]
@@ -184,9 +198,15 @@ async def generate_trip_itinerary(
         return parsed if isinstance(parsed, list) else None
 
     except Exception as e:
-        print(f"[AI] Gemini Itinerary Generation error: {type(e).__name__}: {e}")
-        return None
+        print(f"[AI] Gemini Itinerary Generation error (attempting retry if applicable): {type(e).__name__}: {e}")
+        raise e
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((Exception)),
+    reraise=True
+)
 async def rebalance_day_itinerary(
     city: str, 
     country: str, 
@@ -196,8 +216,6 @@ async def rebalance_day_itinerary(
     user_preferences: dict = None,
     budget_level: str = "STANDARD"
 ) -> Optional[dict]:
-    import os
-    import json
     from google import genai
     from google.genai import types
 
@@ -274,20 +292,18 @@ async def rebalance_day_itinerary(
             )
         )
         
-        text = response.text
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-            
-        parsed = json.loads(text)
-        
-        return parsed
+        return _parse_ai_json(response.text)
 
     except Exception as e:
-        print(f"[AI] Gemini Day Rebalance error: {type(e).__name__}: {e}")
-        return None
+        print(f"[AI] Gemini Day Rebalance error (attempting retry): {type(e).__name__}: {e}")
+        raise e
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((Exception)),
+    reraise=True
+)
 async def estimate_transport_options(
     origin: str,
     destination: str,
@@ -295,8 +311,6 @@ async def estimate_transport_options(
     country: str,
 ) -> Optional[Dict[str, Any]]:
     """Use Gemini to estimate realistic transport options between two locations."""
-    import os
-    import json
     from google import genai
     from google.genai import types
 
@@ -353,18 +367,17 @@ async def estimate_transport_options(
             )
         )
 
-        text = response.text
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-
-        parsed = json.loads(text)
-        return parsed
+        return _parse_ai_json(response.text)
 
     except Exception as e:
-        print(f"[AI] Gemini Transport Estimate error: {type(e).__name__}: {e}")
-        return None
+        print(f"[AI] Gemini Transport Estimate error (attempting retry): {type(e).__name__}: {e}")
+        raise e
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((Exception)),
+    reraise=True
+)
 async def generate_budget_insights(
     city: str,
     country: str,
@@ -375,8 +388,6 @@ async def generate_budget_insights(
     target_budget: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """Use Gemini to generate a detailed budget breakdown for a trip."""
-    import os
-    import json
     from google import genai
     from google.genai import types
 
@@ -445,7 +456,7 @@ async def generate_budget_insights(
 
     try:
         response = client.models.generate_content(
-            model='gemini-flash-latest', 
+            model='gemini-2.0-flash', 
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -454,18 +465,18 @@ async def generate_budget_insights(
             )
         )
 
-        text = response.text
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-
-        parsed = json.loads(text)
-        return parsed
+        return _parse_ai_json(response.text)
 
     except Exception as e:
-        print(f"[AI] Gemini Budget Estimate error: {type(e).__name__}: {e}")
-        return None
+        print(f"[AI] Gemini Budget Estimate error (attempting retry): {type(e).__name__}: {e}")
+        raise e
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((Exception)),
+    reraise=True
+)
 async def generate_trip_checklist(
     city: str,
     country: str,
@@ -478,8 +489,6 @@ async def generate_trip_checklist(
     Generate a context-aware pre-trip checklist using Gemini.
     Considers India-specific context (Domestic vs International), weather, and activities.
     """
-    import os
-    import json
     from google import genai
     from google.genai import types
 
@@ -539,15 +548,9 @@ async def generate_trip_checklist(
             )
         )
         
-        text = response.text
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-            
-        parsed = json.loads(text)
+        parsed = _parse_ai_json(response.text)
         return parsed if isinstance(parsed, list) else None
 
     except Exception as e:
-        print(f"[AI] Checklist generation error: {e}")
-        return None
+        print(f"[AI] Checklist generation error (attempting retry): {type(e).__name__}: {e}")
+        raise e
