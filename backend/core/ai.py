@@ -371,6 +371,8 @@ async def generate_budget_insights(
     departure_city: str,
     duration_days: int,
     activities: list,
+    budget_level: str = "STANDARD",
+    target_budget: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """Use Gemini to generate a detailed budget breakdown for a trip."""
     import os
@@ -392,9 +394,14 @@ async def generate_budget_insights(
         "Respond solely with valid JSON. Do not add any markdown or text outside JSON."
     )
 
+    budget_context = f"Budget Level: {budget_level}"
+    if target_budget:
+        budget_context += f", Target Total Budget: ₹{target_budget} (INR)"
+
     user_prompt = f"""
     Provide a detailed realistic budget estimation for a {duration_days}-day trip to {city}, {country} for one person.
     Departure City: {departure_city}
+    {budget_context}
 
     Planned Activities:
     {activities_str}
@@ -427,7 +434,13 @@ async def generate_budget_insights(
       }}
     }}
 
-    Use realistic current market rates in Indian Rupees (INR). Ensure the total_estimated_range takes into account flights, 4-star hotels, food, and activities.
+    CONSTRAINTS:
+    1. Use realistic current market rates in Indian Rupees (INR).
+    2. The total_estimated_range MUST be realistic based on the {budget_level} tier:
+       - STANDARD: Focus on 3-star/4-star mix, affordable dining, and public transit.
+       - COMFORT: Focus on solid 4-star hotels, taxis/Uber, and good restaurants.
+       - LUXURY: Focus on 5-star hotels, private transfers, and fine dining.
+    3. If Target Total Budget (₹{target_budget if target_budget else 'N/A'}) is provided, ensure your min_total and max_total estimates are realistically centered around this target, adjusting hotel tiers and daily spending accordingly.
     """
 
     try:
@@ -452,4 +465,89 @@ async def generate_budget_insights(
 
     except Exception as e:
         print(f"[AI] Gemini Budget Estimate error: {type(e).__name__}: {e}")
+        return None
+async def generate_trip_checklist(
+    city: str,
+    country: str,
+    duration_days: int,
+    start_date: str,
+    itinerary: list,
+    departure_city: str = "New Delhi"
+) -> Optional[list]:
+    """
+    Generate a context-aware pre-trip checklist using Gemini.
+    Considers India-specific context (Domestic vs International), weather, and activities.
+    """
+    import os
+    import json
+    from google import genai
+    from google.genai import types
+
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        print("[AI] GEMINI_API_KEY is not set.")
+        return None
+
+    client = genai.Client(api_key=gemini_key)
+
+    is_international = country.lower() != "india"
+    
+    # Extract activity keywords to nudge packing list
+    activities_summary = []
+    for day in itinerary[:5]: # Use first 5 days for context
+        for act in day.get('activities', []):
+            activities_summary.append(act.get('title', ''))
+    activities_str = ", ".join(activities_summary[:10])
+
+    system_prompt = (
+        "You are an expert travel assistant specializing in Indian travellers. "
+        "Respond strictly with a JSON array of checklist items. "
+        "Each item must have 'category' (Enum: TRAVEL, STAY, ESSENTIALS, DOCUMENTS, HEALTH) and 'label'."
+    )
+
+    user_prompt = f"""
+    Create a detailed, context-aware pre-trip checklist for an Indian traveller going to {city}, {country} for {duration_days} days starting {start_date}.
+    
+    DEPARTURE CITY: {departure_city}
+    NATURE: {'INTERNATIONAL' if is_international else 'DOMESTIC'}
+    PLANNED ACTIVITIES: {activities_str}
+
+    CRITICAL CONSTRAINTS:
+    1. INDIA-FIRST CONTEXT: 
+       - If INTERNATIONAL: Include Passport, Visa, International Roaming, Forex, Travel Insurance, Universal Power Adapter.
+       - If DOMESTIC: Focus on Aadhar/ID, UPI setup, local transport apps.
+    2. WEATHER & GEOGRAPHY: Based on {city} in {start_date}, suggest clothing (e.g. woollens if cold, umbrella if rainy, sunscreen if beach).
+    3. ACTIVITY-BASED: If activities involve hiking, include boots. If swimming, include swimwear. If temples, include appropriate clothing.
+    4. NO CHAT: Just the JSON array.
+
+    Return Format:
+    [
+      {{ "category": "DOCUMENTS", "label": "string" }},
+      {{ "category": "TRAVEL", "label": "string" }},
+      ...
+    ]
+    """
+
+    try:
+        response = client.models.generate_content(
+            model='gemini-flash-latest',
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                temperature=0.5,
+            )
+        )
+        
+        text = response.text
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
+            
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, list) else None
+
+    except Exception as e:
+        print(f"[AI] Checklist generation error: {e}")
         return None

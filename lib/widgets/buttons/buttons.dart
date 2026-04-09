@@ -8,6 +8,9 @@ class PrimaryButton extends StatelessWidget {
   final bool isLoading;
   final IconData? icon;
 
+  final double? width;
+  final double? height;
+
   const PrimaryButton({
     super.key,
     required this.text,
@@ -15,13 +18,15 @@ class PrimaryButton extends StatelessWidget {
     this.showArrow = true,
     this.isLoading = false,
     this.icon,
+    this.width,
+    this.height,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: double.infinity,
-      height: 56,
+      width: width ?? double.infinity,
+      height: height ?? 56,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         child: isLoading
@@ -72,14 +77,26 @@ class SecondaryButton extends StatelessWidget {
       height: 56,
       child: OutlinedButton(
         onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.white24),
+          foregroundColor: Colors.white,
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 20),
+              Icon(icon, size: 20, color: Colors.white),
               const SizedBox(width: 8),
             ],
-            Text(text),
+            Text(
+              text,
+              style: const TextStyle(
+                fontFamily: 'RobotoMono',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1,
+              ),
+            ),
           ],
         ),
       ),

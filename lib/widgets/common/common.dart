@@ -99,8 +99,9 @@ class ChecklistItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white.withOpacity(0.05), // Dark mode background
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
         ),
         child: Row(
           children: [
@@ -108,15 +109,15 @@ class ChecklistItem extends StatelessWidget {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: isChecked ? Colors.black : Colors.transparent,
+                color: isChecked ? Colors.white : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: isChecked ? Colors.black : Colors.grey.shade400,
+                  color: isChecked ? Colors.white : Colors.white24,
                   width: 2,
                 ),
               ),
               child: isChecked
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  ? const Icon(Icons.check, size: 16, color: Colors.black)
                   : null,
             ),
             const SizedBox(width: 16),
@@ -125,7 +126,7 @@ class ChecklistItem extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 15,
-                  color: isChecked ? Colors.grey : Colors.black87,
+                  color: isChecked ? Colors.white38 : Colors.white,
                   decoration: isChecked ? TextDecoration.lineThrough : null,
                 ),
               ),
@@ -155,9 +156,9 @@ class AiInputBar extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
         child: Row(
           children: [
@@ -172,7 +173,7 @@ class AiInputBar extends StatelessWidget {
                 hintText,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey.shade500,
+                  color: Colors.white.withOpacity(0.4),
                 ),
               ),
             ),
@@ -186,7 +187,7 @@ class AiInputBar extends StatelessWidget {
               child: Icon(
                 Icons.arrow_upward,
                 size: 18,
-                color: Colors.grey.shade600,
+                color: Colors.white.withOpacity(0.6),
               ),
             ),
           ],

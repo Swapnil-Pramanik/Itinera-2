@@ -7,6 +7,42 @@ import 'constants.dart';
 class TripService {
   static const String _backendUrl = AppConstants.backendUrl;
 
+  /// Fetches a specific trip by its ID.
+  static Future<Map<String, dynamic>?> getTripById(String tripId) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return null;
+
+    // Try backend first
+    try {
+      final response = await http.get(
+        Uri.parse('$_backendUrl/api/trips/$tripId'),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {
+      // Backend unavailable — fall back to direct Supabase query
+    }
+
+    // Fallback: query Supabase directly
+    try {
+      final response = await Supabase.instance.client
+          .from('trips')
+          .select('*, destinations(name, country, latitude, longitude, image_url)')
+          .eq('id', tripId)
+          .single();
+
+      return Map<String, dynamic>.from(response);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Fetches the current user's trips.
   /// Tries the FastAPI backend first; falls back to direct Supabase query.
   static Future<List<Map<String, dynamic>>> getMyTrips() async {
@@ -46,7 +82,6 @@ class TripService {
     }
   }
 
-  /// Creates a new trip record via the backend.
   static Future<Map<String, dynamic>?> createTrip({
     required String destinationId,
     String? title,
@@ -55,6 +90,8 @@ class TripService {
     String? departureCity,
     List<String>? tags,
     String? notes,
+    String budgetLevel = 'STANDARD',
+    int? targetBudget,
   }) async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return null;
@@ -74,6 +111,8 @@ class TripService {
           'departure_city': departureCity,
           'tags': tags ?? [],
           'notes': notes,
+          'budget_level': budgetLevel,
+          'target_budget': targetBudget,
         }),
       ).timeout(const Duration(seconds: 10));
 
@@ -252,5 +291,128 @@ class TripService {
       print('[TripService] getTripDays error: $e');
     }
     return [];
+  }
+
+  // --- Checklist Methods ---
+
+  /// Fetch checklist items for a trip. Auto-initializes if none exist.
+  static Future<List<Map<String, dynamic>>> getChecklist(String tripId) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return [];
+
+    try {
+      final response = await Supabase.instance.client
+          .from('checklist_items')
+          .select('*')
+          .eq('trip_id', tripId)
+          .order('sort_order', ascending: true);
+
+      final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(response);
+      
+      if (items.isEmpty) {
+        // Auto-initialize from templates
+        return await initializeChecklist(tripId);
+      }
+      
+      return items;
+    } catch (e) {
+      print('[TripService] getChecklist error: $e');
+      return [];
+    }
+  }
+
+  /// Toggles a checklist item's completion status.
+  static Future<bool> toggleChecklistItem(String itemId, bool isCompleted) async {
+    try {
+      await Supabase.instance.client
+          .from('checklist_items')
+          .update({
+            'is_completed': isCompleted,
+            'completed_at': isCompleted ? DateTime.now().toIso8601String() : null,
+          })
+          .eq('id', itemId);
+      return true;
+    } catch (e) {
+      print('[TripService] toggleChecklistItem error: $e');
+      return false;
+    }
+  }
+
+  /// Copies default checklist templates into trip-specific checklist items.
+  /// (Deprecated: Switch to smart checklist generation)
+  static Future<List<Map<String, dynamic>>> initializeChecklist(String tripId) async {
+    return await generateChecklist(tripId);
+  }
+
+  /// Triggers AI-powered context-aware checklist generation.
+  static Future<List<Map<String, dynamic>>> generateChecklist(String tripId) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return [];
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_backendUrl/api/trips/$tripId/checklist/generate'),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return await getChecklist(tripId); // Fetch from DB to ensure consistency
+      }
+    } catch (e) {
+      print('[TripService] generateChecklist error: $e');
+    }
+    return [];
+  }
+
+  /// Manually add a checklist item.
+  static Future<Map<String, dynamic>?> addChecklistItem(String tripId, String label, String category) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return null;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_backendUrl/api/trips/$tripId/checklist_items'),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'label': label,
+          'category': category,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('[TripService] addChecklistItem error: $e');
+    }
+    return null;
+  }
+
+  /// Remove a checklist item.
+  static Future<bool> removeChecklistItem(String itemId) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return false;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('$_backendUrl/api/trips/checklist_items/$itemId'),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      return response.statusCode == 204;
+    } catch (e) {
+      print('[TripService] removeChecklistItem error: $e');
+      return false;
+    }
   }
 }

@@ -207,6 +207,21 @@ class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
                     ),
                   );
 
+                  // Calculate target budget based on selected level
+                  final days = _endDate.difference(_startDate).inDays;
+                  final baseDaily = widget.dailyCost ?? 100.0;
+                  final luxuryDaily = widget.luxuryDailyCost ?? (baseDaily * 2.5);
+                  final comfortDaily = (baseDaily + luxuryDaily) / 2;
+                  
+                  int targetBudget;
+                  if (_selectedBudget == 'LUXURY') {
+                    targetBudget = (luxuryDaily * days).round();
+                  } else if (_selectedBudget == 'COMFORT') {
+                    targetBudget = (comfortDaily * days).round();
+                  } else {
+                    targetBudget = (baseDaily * days).round();
+                  }
+
                   // 1. Create the trip record
                   final trip = await TripService.createTrip(
                     destinationId: widget.destinationId,
@@ -215,6 +230,8 @@ class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
                     departureCity: _departureCityController.text.trim().isNotEmpty 
                       ? _departureCityController.text.trim() 
                       : null,
+                    budgetLevel: _selectedBudget,
+                    targetBudget: targetBudget,
                   );
 
                   // Hide loading

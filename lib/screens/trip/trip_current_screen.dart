@@ -1,425 +1,376 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/trip_service.dart';
 import '../../widgets/common/common.dart';
+import '../../widgets/buttons/buttons.dart';
 
-/// Trip Current Screen - Active/ongoing trip view
-class TripCurrentScreen extends StatelessWidget {
-  const TripCurrentScreen({super.key});
+/// Trip Current Screen - Active trip dashboard with "Now" focus (Dark Theme)
+class TripCurrentScreen extends StatefulWidget {
+  final String tripId;
+  const TripCurrentScreen({super.key, required this.tripId});
+
+  @override
+  State<TripCurrentScreen> createState() => _TripCurrentScreenState();
+}
+
+class _TripCurrentScreenState extends State<TripCurrentScreen> {
+  Map<String, dynamic>? _trip;
+  List<Map<String, dynamic>> _itinerary = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTripData();
+  }
+
+  Future<void> _fetchTripData() async {
+    try {
+      final tripData = await TripService.getTripById(widget.tripId);
+      final itineraryData = await TripService.getTripDays(widget.tripId);
+
+      if (mounted) {
+        setState(() {
+          _trip = tripData;
+          _itinerary = itineraryData;
+          _isLoading = false;
+          if (_trip == null) _error = 'Trip not found';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load trip: $e';
+        });
+      }
+    }
+  }
+
+  // Helpers
+  String get _title => _trip?['destinations']?['name'] ?? _trip?['title'] ?? 'CURRENT TRIP';
+  String get _country => _trip?['destinations']?['country'] ?? '';
+  String? get _imageUrl => _trip?['destinations']?['image_url'];
+
+  int get _currentDayNumber {
+    if (_trip?['start_date'] == null) return 1;
+    final start = DateTime.tryParse(_trip!['start_date']);
+    if (start == null) return 1;
+    
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final diff = today.difference(start).inDays;
+    return (diff + 1).clamp(1, _itinerary.length.clamp(1, 100));
+  }
+
+  Map<String, dynamic>? get _currentDayData {
+    if (_itinerary.isEmpty) return null;
+    final dayNum = _currentDayNumber;
+    return _itinerary.firstWhere(
+      (d) => d['day_number'] == dayNum,
+      orElse: () => _itinerary.first,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Row(
-          children: [
-            Text(
-              'Itinera',
-              style: TextStyle(
-                fontFamily: 'RobotoMono',
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Row(
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF121212),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.wb_sunny_outlined,
-                  size: 16, color: Colors.grey.shade600),
-              const SizedBox(width: 4),
-              Text(
-                '22°C',
-                style: TextStyle(
-                  fontFamily: 'RobotoMono',
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                ),
-              ),
+              Text(_error!, style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 16),
+              PrimaryButton(text: 'RETRY', onPressed: _fetchTripData),
             ],
           ),
-          const SizedBox(width: 16),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.menu, color: Colors.black87),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+      );
+    }
+
+    final dayData = _currentDayData;
+    final activities = (dayData?['activities'] as List? ?? []);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      body: CustomScrollView(
+        slivers: [
+          // Cinematic Header
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: const Color(0xFF121212),
+            leading: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
                 children: [
-                  // Location
-                  Row(
-                    children: [
-                      Icon(Icons.place, size: 14, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(
-                        'KYOTO, JAPAN',
-                        style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                          letterSpacing: 1,
-                        ),
+                  if (_imageUrl != null)
+                    CachedNetworkImage(
+                      imageUrl: _imageUrl!,
+                      fit: BoxFit.cover,
+                    )
+                  else
+                    Container(color: Colors.grey.shade900),
+                  
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.4),
+                          const Color(0xFF121212),
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
                       ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Today • Day 3
-                  const Text(
-                    'Today • Day 3',
-                    style: TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  Positioned(
+                    bottom: 30,
+                    left: 20,
+                    right: 20,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 14, color: Colors.redAccent),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$_title, $_country'.toUpperCase(),
+                              style: const TextStyle(
+                                fontFamily: 'RobotoMono',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'DAY $_currentDayNumber: ${dayData?['day_title'] ?? 'EXPLORATION'}',
+                          style: const TextStyle(
+                            fontFamily: 'RobotoMono',
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
-                  // Current activity indicator
+          // Action Section
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Indicators
                   Row(
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
+                      _buildStatusPulse(),
                       const SizedBox(width: 8),
                       const Text(
-                        'CURRENT ACTIVITY',
+                        'LIVE UPDATES',
+                        style: TextStyle(
+                          fontFamily: 'RobotoMono',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.wb_sunny_outlined, size: 16, color: Colors.white70),
+                      const SizedBox(width: 4),
+                      const Text(
+                        '24°C',
                         style: TextStyle(
                           fontFamily: 'RobotoMono',
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          '09:00 - 11:00',
-                          style: TextStyle(
-                            fontFamily: 'RobotoMono',
-                            fontSize: 11,
-                          ),
+                          color: Colors.white70,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
+                  const SizedBox(height: 24),
 
-            const SizedBox(height: 16),
-
-            // Map with current location
-            Container(
-              height: 200,
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Stack(
-                children: [
-                  // Map pattern
-                  CustomPaint(
-                    size: const Size(double.infinity, 200),
-                    painter: _MapPatternPainter(),
-                  ),
-                  // Location title
-                  Positioned(
-                    left: 16,
-                    bottom: 50,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 8,
+                  // Map Placeholder (Dark style)
+                  Container(
+                    height: 180,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5),
+                    ),
+                    child: Stack(
+                      children: [
+                        const Center(
+                          child: Icon(Icons.map_outlined, size: 40, color: Colors.white24),
+                        ),
+                        Positioned(
+                          left: 16,
+                          bottom: 16,
+                          child: PrimaryButton(
+                            text: 'OPEN MAPS',
+                            onPressed: () {},
+                            showArrow: false,
+                            width: 140,
+                            height: 44,
                           ),
-                        ],
-                      ),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'KINKAKU-JI',
-                            style: TextStyle(
-                              fontFamily: 'RobotoMono',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            'TEMPLE',
-                            style: TextStyle(
-                              fontFamily: 'RobotoMono',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 16),
+                  const SizedBox(height: 32),
 
-            // Action buttons
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.navigation_outlined, size: 18),
-                      label: const Text('NAVIGATE'),
+                  // Timeline Section
+                  Text(
+                    'COMING UP NEXT',
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withOpacity(0.4),
+                      letterSpacing: 1.5,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.check, size: 18),
-                      label: const Text('MARK DONE'),
-                    ),
-                  ),
+                  const SizedBox(height: 16),
+
+                  if (activities.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Text('Relax and enjoy the day!', style: TextStyle(color: Colors.white.withOpacity(0.3))),
+                    )
+                  else
+                    ...activities.map((act) => _buildLiveActivityCard(act)),
+
+                  const SizedBox(height: 24),
+
+                  // AI Input - The common AiInputBar already has some white background, but I'll make it fit
+                  const AiInputBar(hintText: 'Ask Itinera to find food nearby...'),
+                  
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
-
-            const SizedBox(height: 28),
-
-            // Coming up section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'COMING UP',
-                style: TextStyle(
-                  fontFamily: 'RobotoMono',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Upcoming activities
-            _buildUpcomingActivity(
-              'RYOAN-JI',
-              'Zen rock garden',
-              '11:30',
-            ),
-
-            _buildUpcomingActivity(
-              'NISHIKI MARKET',
-              'Kyoto\'s Kitchen',
-              '13:00',
-            ),
-
-            const SizedBox(height: 24),
-
-            // Quick actions
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _buildQuickAction('RUNNING LATE'),
-                  _buildQuickAction('FIND FOOD NEARBY'),
-                  _buildQuickAction('SKIP THIS'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // AI input bar
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: AiInputBar(
-                hintText: 'ASK ITINERA...',
-              ),
-            ),
-
-            const SizedBox(height: 40),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildUpcomingActivity(String title, String subtitle, String time) {
+  Widget _buildStatusPulse() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      padding: const EdgeInsets.all(16),
+      width: 10,
+      height: 10,
+      decoration: const BoxDecoration(
+        color: Colors.redAccent,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(color: Colors.redAccent, blurRadius: 4, spreadRadius: 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveActivityCard(Map<String, dynamic> activity) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Row(
         children: [
-          // Image placeholder
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.image, color: Colors.grey),
+          Column(
+            children: [
+              Text(
+                activity['time'] ?? 'NOW',
+                style: const TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Icon(Icons.arrow_downward, size: 12, color: Colors.white.withOpacity(0.3)),
+            ],
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
+                  (activity['type'] ?? 'VISIT').toUpperCase(),
+                  style: TextStyle(
                     fontFamily: 'RobotoMono',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent.shade100,
+                    letterSpacing: 0.5,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  subtitle,
+                  activity['title'] ?? 'Activity',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  activity['description'] ?? 'Enjoy your time here.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    color: Colors.white.withOpacity(0.5),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () {},
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(
-                        'SKIP',
-                        style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    TextButton(
-                      onPressed: () {},
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(
-                        'DELAY 30M',
-                        style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
           ),
-          Text(
-            time,
-            style: const TextStyle(
-              fontFamily: 'RobotoMono',
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+          const SizedBox(width: 12),
+          IconButton(
+            onPressed: () {},
+            icon: Icon(Icons.check_circle_outline, color: Colors.white.withOpacity(0.2)),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildQuickAction(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: 'RobotoMono',
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
-
-class _MapPatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.grey.shade400
-      ..strokeWidth = 0.5
-      ..style = PaintingStyle.stroke;
-
-    for (var i = 0; i < size.width; i += 25) {
-      canvas.drawLine(
-        Offset(i.toDouble(), 0),
-        Offset(i.toDouble(), size.height),
-        paint,
-      );
-    }
-    for (var i = 0; i < size.height; i += 25) {
-      canvas.drawLine(
-        Offset(0, i.toDouble()),
-        Offset(size.width, i.toDouble()),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

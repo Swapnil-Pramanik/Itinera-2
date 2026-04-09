@@ -57,7 +57,9 @@ def create_trip(trip: TripCreate, user_payload: dict = Depends(get_current_user)
         "departure_city": trip.departure_city,
         "tags": trip.tags,
         "notes": trip.notes,
-        "status": "DRAFT"
+        "status": "DRAFT",
+        "budget_level": trip.budget_level,
+        "target_budget": trip.target_budget
     }
 
     try:
@@ -113,6 +115,8 @@ def update_trip(trip_id: str, trip: TripUpdate, user_payload: dict = Depends(get
     if trip.tags is not None: update_data["tags"] = trip.tags
     if trip.notes is not None: update_data["notes"] = trip.notes
     if trip.status is not None: update_data["status"] = trip.status
+    if trip.budget_level is not None: update_data["budget_level"] = trip.budget_level
+    if trip.target_budget is not None: update_data["target_budget"] = trip.target_budget
 
     if not update_data:
         # Fetch current if nothing to update
@@ -564,7 +568,9 @@ async def get_trip_budget_breakdown(trip_id: str, user_payload: dict = Depends(g
             country=dest["country"],
             departure_city=trip.get("departure_city") or "New Delhi",
             duration_days=duration,
-            activities=all_activities
+            activities=all_activities,
+            budget_level=trip.get("budget_level", "STANDARD"),
+            target_budget=trip.get("target_budget")
         )
         
         if not budget_data:
@@ -603,3 +609,115 @@ async def get_trip_budget_breakdown(trip_id: str, user_payload: dict = Depends(g
     except Exception as e:
         print(f"[API] Budget breakdown error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+@router.post("/{trip_id}/checklist/generate")
+async def generate_trip_checklist_api(trip_id: str, user_payload: dict = Depends(get_current_user)):
+    """Orchestrate AI checklist generation and save to checklist_items."""
+    user_id = user_payload.get("sub")
+    supabase = get_supabase()
+
+    try:
+        # 1. Fetch trip and destination data
+        trip_res = (
+            supabase.table("trips")
+            .select("*, destinations(*)")
+            .eq("id", trip_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+        if not (hasattr(trip_res, "data") and trip_res.data):
+            raise HTTPException(status_code=404, detail="Trip not found")
+        
+        trip = trip_res.data
+        dest = trip.get("destinations")
+        
+        # 2. Fetch itinerary for context
+        from api.trips import get_trip_itinerary
+        itinerary = get_trip_itinerary(trip_id, user_payload)
+
+        # 3. Call AI
+        from core.ai import generate_trip_checklist
+        checklist = await generate_trip_checklist(
+            city=dest["name"],
+            country=dest["country"],
+            duration_days=0, # Will calculate if needed inside AI
+            start_date=trip.get("start_date") or "",
+            itinerary=itinerary,
+            departure_city=trip.get("departure_city") or "New Delhi"
+        )
+        
+        if not checklist:
+            raise HTTPException(status_code=500, detail="AI failed to generate checklist")
+        
+        # 4. Save to checklist_items
+        # Clear existing items first
+        supabase.table("checklist_items").delete().eq("trip_id", trip_id).execute()
+        
+        items_to_insert = []
+        for i, item in enumerate(checklist):
+            items_to_insert.append({
+                "trip_id": trip_id,
+                "category": item.get("category", "ESSENTIALS"),
+                "label": item.get("label"),
+                "is_completed": False,
+                "sort_order": i
+            })
+        
+        if items_to_insert:
+            supabase.table("checklist_items").insert(items_to_insert).execute()
+            
+        return {"status": "success", "items": checklist}
+
+    except Exception as e:
+        print(f"[API] Checklist generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ChecklistItemCreate(BaseModel):
+    label: str
+    category: str = "ESSENTIALS"
+
+@router.post("/{trip_id}/checklist_items")
+def add_checklist_item(trip_id: str, item: ChecklistItemCreate, user_payload: dict = Depends(get_current_user)):
+    """Add a manual item to the trip checklist."""
+    user_id = user_payload.get("sub")
+    supabase = get_supabase()
+
+    # Verify ownership
+    trip = supabase.table("trips").select("id").eq("id", trip_id).eq("user_id", user_id).single().execute()
+    if not (hasattr(trip, "data") and trip.data):
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    new_item = {
+        "trip_id": trip_id,
+        "label": item.label,
+        "category": item.category,
+        "is_completed": False
+    }
+
+    res = supabase.table("checklist_items").insert(new_item).execute()
+    if hasattr(res, "data") and res.data:
+        return res.data[0]
+    raise HTTPException(status_code=500, detail="Failed to add item")
+
+@router.delete("/checklist_items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_checklist_item(item_id: str, user_payload: dict = Depends(get_current_user)):
+    """Delete a checklist item."""
+    user_id = user_payload.get("sub")
+    supabase = get_supabase()
+
+    # Join check to ensure item belongs to a trip owned by the user
+    item_res = (
+        supabase.table("checklist_items")
+        .select("id, trips(user_id)")
+        .eq("id", item_id)
+        .single()
+        .execute()
+    )
+    
+    if not (hasattr(item_res, "data") and item_res.data):
+        raise HTTPException(status_code=404, detail="Item not found")
+        
+    if item_res.data["trips"]["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    supabase.table("checklist_items").delete().eq("id", item_id).execute()

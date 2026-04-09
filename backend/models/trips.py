@@ -11,6 +11,8 @@ class TripCreate(BaseModel):
     departure_city: Optional[str] = None
     tags: Optional[List[str]] = []
     notes: Optional[str] = None
+    budget_level: Optional[str] = "STANDARD"
+    target_budget: Optional[int] = None
 
 class TripUpdate(BaseModel):
     title: Optional[str] = None
@@ -19,6 +21,8 @@ class TripUpdate(BaseModel):
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    budget_level: Optional[str] = None
+    target_budget: Optional[int] = None
 
 class TripResponse(BaseModel):
     id: UUID
@@ -32,6 +36,8 @@ class TripResponse(BaseModel):
     places_visited: int
     activities_done: int
     notes: Optional[str] = None
+    budget_level: str
+    target_budget: Optional[int] = None
     created_at: str
     updated_at: str
 

@@ -7,6 +7,8 @@ import '../../widgets/appbars/appbars.dart';
 import '../../widgets/cards/cards.dart';
 import '../../widgets/common/common.dart';
 import '../trip/trip_scheduled_screen.dart';
+import '../trip/trip_current_screen.dart';
+import '../trip/trip_completed_screen.dart';
 import '../../widgets/overlays/loading_buffer_screen.dart';
 import 'my_atlas_bottom_sheet.dart';
 import 'profile_screen.dart';
@@ -504,12 +506,30 @@ class _HomeScreenState extends State<HomeScreen> {
             imageUrl: imageUrl,
             statusLabel: status,
             onTap: () {
+              final tripId = trip['id'];
+              if (tripId == null) return;
+
+              Widget targetScreen;
+              switch (status) {
+                case "UPCOMING":
+                  targetScreen = TripScheduledScreen(tripId: tripId);
+                  break;
+                case "ONGOING":
+                  targetScreen = TripCurrentScreen(tripId: tripId);
+                  break;
+                case "PAST":
+                  targetScreen = TripCompletedScreen(tripId: tripId);
+                  break;
+                default:
+                  targetScreen = TripScheduledScreen(tripId: tripId);
+              }
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const TripScheduledScreen(),
+                  builder: (context) => targetScreen,
                 ),
-              );
+              ).then((_) => _loadTrips());
             },
           );
         },
