@@ -47,7 +47,10 @@ class _TimelineSelectorScreenState extends State<TimelineSelectorScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.send, size: 18, color: Colors.black87),
+            Image.asset(
+              'assets/images/logo_black.png',
+              height: 20,
+            ),
             const SizedBox(width: 8),
             const Text(
               'Itinera',

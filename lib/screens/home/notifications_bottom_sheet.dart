@@ -1,9 +1,55 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
+import '../../core/notification_service.dart';
+import '../../models/notification_model.dart';
 
 /// Notifications Bottom Sheet - Modal to display alerts and suggestions
-class NotificationsBottomSheet extends StatelessWidget {
+class NotificationsBottomSheet extends StatefulWidget {
   const NotificationsBottomSheet({super.key});
+
+  @override
+  State<NotificationsBottomSheet> createState() => _NotificationsBottomSheetState();
+}
+
+class _NotificationsBottomSheetState extends State<NotificationsBottomSheet> {
+  List<NotificationModel> _notifications = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    try {
+      final notifications = await NotificationService.getNotifications();
+      if (mounted) {
+        setState(() {
+          _notifications = notifications;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _clearAll() async {
+    final success = await NotificationService.clearAll();
+    if (success && mounted) {
+      setState(() {
+        _notifications = [];
+      });
+    }
+  }
+
+  Future<void> _markAsRead(String id) async {
+    await NotificationService.markAsRead(id);
+    // Optionally remove or update the UI local state if needed
+    // For now we just mark it on the backend, and if they reopen it will be gone from the unread list
+    // or updated if we show read notifications.
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +90,13 @@ class NotificationsBottomSheet extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: _notifications.isNotEmpty ? _clearAll : null,
                   child: Text(
                     'Clear all',
                     style: TextStyle(
                       fontFamily: 'RobotoMono',
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: _notifications.isNotEmpty ? Colors.grey.shade600 : Colors.grey.shade300,
                     ),
                   ),
                 ),
@@ -62,42 +108,50 @@ class NotificationsBottomSheet extends StatelessWidget {
 
           // Notification List
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                _buildNotificationItem(
-                  context,
-                  type: _NotificationType.alert,
-                  title: 'BUDGET ALERT',
-                  message: 'Your Florence trip exceeds target budget by ₹12,400. Optimization suggested.',
-                  time: '2 hours ago',
-                  actionLabel: 'Adjust Budget',
-                ),
-                _buildNotificationItem(
-                  context,
-                  type: _NotificationType.weather,
-                  title: 'WEATHER UPDATE',
-                  message: 'Heavy rain forecast for London tomorrow. Don\'t forget your umbrella!',
-                  time: '5 hours ago',
-                  actionLabel: 'View Checklist',
-                ),
-                _buildNotificationItem(
-                  context,
-                  type: _NotificationType.suggestion,
-                  title: 'SMART SUGGESTION',
-                  message: '✨ Found 3 cheaper transport options for your Kyoto trip next month.',
-                  time: '1 day ago',
-                  actionLabel: 'View Details',
-                ),
-                _buildNotificationItem(
-                  context,
-                  type: _NotificationType.info,
-                  title: 'TRIP READY',
-                  message: 'Your custom itinerary for Tokyo is fully generated and ready!',
-                  time: '2 days ago',
-                  actionLabel: 'Open Itinerary',
-                ),
-              ],
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Colors.black))
+                : _notifications.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _notifications.length,
+                        itemBuilder: (context, index) {
+                          final notification = _notifications[index];
+                          return _buildNotificationItem(
+                            context,
+                            notification: notification,
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.notifications_none_rounded, size: 64, color: Colors.grey.shade200),
+          const SizedBox(height: 16),
+          Text(
+            'ALL CAUGHT UP',
+            style: TextStyle(
+              fontFamily: 'RobotoMono',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade400,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'No new notifications for you right now.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade400,
             ),
           ),
         ],
@@ -107,33 +161,29 @@ class NotificationsBottomSheet extends StatelessWidget {
 
   Widget _buildNotificationItem(
     BuildContext context, {
-    required _NotificationType type,
-    required String title,
-    required String message,
-    required String time,
-    String? actionLabel,
+    required NotificationModel notification,
   }) {
     Color iconColor;
     IconData iconData;
     Color bgColor;
 
-    switch (type) {
-      case _NotificationType.alert:
+    switch (notification.type) {
+      case NotificationType.alert:
         iconColor = const Color(0xFFFF5252);
         iconData = Icons.warning_amber_rounded;
         bgColor = const Color(0xFFFF5252).withOpacity(0.1);
         break;
-      case _NotificationType.suggestion:
+      case NotificationType.suggestion:
         iconColor = const Color(0xFFFFB300);
         iconData = Icons.lightbulb_outline_rounded;
         bgColor = const Color(0xFFFFB300).withOpacity(0.1);
         break;
-      case _NotificationType.weather:
+      case NotificationType.weather:
         iconColor = const Color(0xFF40C4FF);
         iconData = Icons.wb_sunny_outlined;
         bgColor = const Color(0xFF40C4FF).withOpacity(0.1);
         break;
-      case _NotificationType.info:
+      case NotificationType.info:
         iconColor = const Color(0xFF4CAF50);
         iconData = Icons.check_circle_outline_rounded;
         bgColor = const Color(0xFF4CAF50).withOpacity(0.1);
@@ -146,7 +196,7 @@ class NotificationsBottomSheet extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(color: notification.isRead ? Colors.grey.shade50 : Colors.grey.shade100),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -176,7 +226,7 @@ class NotificationsBottomSheet extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      title,
+                      notification.type.name.toUpperCase(),
                       style: TextStyle(
                         fontFamily: 'RobotoMono',
                         fontSize: 11,
@@ -186,7 +236,7 @@ class NotificationsBottomSheet extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      time,
+                      notification.timeAgo,
                       style: TextStyle(
                         fontSize: 10,
                         color: Colors.grey.shade400,
@@ -196,17 +246,29 @@ class NotificationsBottomSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  message,
+                  notification.title,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  notification.message,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
                     height: 1.4,
                   ),
                 ),
-                if (actionLabel != null) ...[
+                if (notification.actionLabel != null) ...[
                   const SizedBox(height: 12),
                   InkWell(
-                    onTap: () {},
+                    onTap: () {
+                      _markAsRead(notification.id);
+                      // TODO: Implement routing based on notification.actionRoute
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -214,7 +276,7 @@ class NotificationsBottomSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        actionLabel,
+                        notification.actionLabel!,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -227,10 +289,18 @@ class NotificationsBottomSheet extends StatelessWidget {
               ],
             ),
           ),
+          if (!notification.isRead)
+            Container(
+              margin: const EdgeInsets.only(left: 8, top: 2),
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFF5252),
+                shape: BoxShape.circle,
+              ),
+            ),
         ],
       ),
     );
   }
 }
-
-enum _NotificationType { alert, suggestion, weather, info }

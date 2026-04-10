@@ -227,15 +227,25 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
                     ),
 
                     // Title & Tagline
-                    const Text(
-                      'Itinera',
-                      style: TextStyle(
-                        fontFamily: 'RobotoMono',
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                        letterSpacing: -0.5,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/images/logo_black.png',
+                          height: 32,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Itinera',
+                          style: TextStyle(
+                            fontFamily: 'RobotoMono',
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(

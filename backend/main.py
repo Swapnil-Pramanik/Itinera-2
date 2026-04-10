@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from api.users import router as users_router
 from api.trips import router as trips_router
 from api.destinations import router as destinations_router
+from api.notifications import router as notifications_router
 
 load_dotenv()
 
@@ -27,6 +28,7 @@ app.add_middleware(
 app.include_router(users_router, prefix="/api")
 app.include_router(trips_router, prefix="/api")
 app.include_router(destinations_router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
 
 @app.get("/")
 def read_root():

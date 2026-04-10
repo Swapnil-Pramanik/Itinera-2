@@ -5,12 +5,14 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onMenuTap;
   final VoidCallback? onNotificationsTap;
   final String? temperature;
+  final bool hasNotifications;
 
   const HomeAppBar({
     super.key,
     this.onMenuTap,
     this.onNotificationsTap,
     this.temperature,
+    this.hasNotifications = false,
   });
 
   @override
@@ -23,6 +25,11 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       title: Row(
         children: [
+          Image.asset(
+            'assets/images/logo_black.png',
+            height: 24,
+          ),
+          const SizedBox(width: 8),
           const Text(
             'Itinera',
             style: TextStyle(
@@ -70,18 +77,19 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                   size: 20,
                   color: Colors.black87,
                 ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF5252),
-                      shape: BoxShape.circle,
+                if (hasNotifications)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF5252),
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

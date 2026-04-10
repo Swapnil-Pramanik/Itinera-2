@@ -14,6 +14,7 @@ import 'my_atlas_bottom_sheet.dart';
 import 'profile_screen.dart';
 import 'search_bottom_sheet.dart';
 import 'notifications_bottom_sheet.dart';
+import '../../core/notification_service.dart';
 
 /// Home Screen - Main dashboard with trips and atlas
 class HomeScreen extends StatefulWidget {
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _recentDestinations = [];
   bool _isLoadingTrips = true;
   bool _isLoadingAtlas = true;
+  int _unreadNotificationsCount = 0;
 
   final PageController _pageController = PageController(viewportFraction: 0.85);
 
@@ -36,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadTrips();
     _loadAtlasArticles();
+    _loadNotificationCount();
   }
 
   @override
@@ -115,19 +118,31 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadNotificationCount() async {
+    try {
+      final count = await NotificationService.getUnreadCount();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationsCount = count;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: HomeAppBar(
         temperature: '--',
+        hasNotifications: _unreadNotificationsCount > 0,
         onNotificationsTap: () {
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             builder: (context) => const NotificationsBottomSheet(),
-          );
+          ).then((_) => _loadNotificationCount());
         },
         onMenuTap: () {
           Navigator.push(
