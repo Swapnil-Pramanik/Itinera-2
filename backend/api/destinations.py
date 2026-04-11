@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from core.security import get_current_user
 from core.supabase import get_supabase
 import httpx
-from typing import Optional
+from typing import Optional, List
 import os
 from core.weather import get_weather_forecast
 from core.ai import generate_destination_insights
 from datetime import datetime, timedelta
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -677,3 +679,41 @@ def _record_search_history(user_id: str, dest_id: str, query: Optional[str] = No
         }).execute()
     except Exception as e:
         print(f"[_record_search_history] Error: {e}")
+
+
+# ──────────────────────────────────────────────
+# 7. Destination Chat (Ollama / gemma4:e4b)
+# ──────────────────────────────────────────────
+
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+class DestinationChatRequest(BaseModel):
+    city: str
+    country: str
+    message: str
+    description: str = ""
+    history: List[ChatMessage] = []
+
+@router.post("/chat")
+async def destination_chat(
+    req: DestinationChatRequest,
+    user_payload: dict = Depends(get_current_user),
+):
+    """Chat about a destination using local Ollama model (gemma4:e4b), streaming."""
+    from core.ai import stream_chat_about_destination
+
+    history = [{"role": m.role, "content": m.content} for m in req.history]
+
+    return StreamingResponse(
+        stream_chat_about_destination(
+            city=req.city,
+            country=req.country,
+            user_message=req.message,
+            conversation_history=history,
+            destination_description=req.description,
+        ),
+        media_type="text/plain",
+    )
+

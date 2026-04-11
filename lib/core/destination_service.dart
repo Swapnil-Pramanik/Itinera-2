@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
+import 'user_service.dart';
 
 /// Service for searching destinations and fetching details from the backend.
 class DestinationService {
@@ -354,6 +355,55 @@ class DestinationService {
     } catch (e) {
       debugPrint('DestinationService.getAllDestinations Error: $e');
       return [];
+    }
+  }
+
+  /// Chat about a destination using local AI (Ollama gemma4:e4b).
+  /// [history] is a list of {role, content} maps representing prior messages.
+  static Stream<String> streamChatWithDestination({
+    required String city,
+    required String country,
+    required String message,
+    String description = '',
+    List<Map<String, String>> history = const [],
+  }) async* {
+    final token = await UserService.getValidAccessToken();
+    if (token == null) {
+      yield "Authentication error. Please log in again.";
+      return;
+    }
+
+    try {
+      final body = jsonEncode({
+        'city': city,
+        'country': country,
+        'message': message,
+        'description': description,
+        'history': history,
+      });
+
+      final request = http.Request('POST', Uri.parse('$_backendUrl/api/destinations/chat'));
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      });
+      request.body = body;
+
+      final client = http.Client();
+      final response = await client.send(request).timeout(const Duration(seconds: 90));
+
+      if (response.statusCode == 200) {
+        await for (var chunk in response.stream.transform(utf8.decoder)) {
+          yield chunk;
+        }
+      } else {
+        debugPrint('[DestinationService] Stream Error: ${response.statusCode}');
+        yield "An error occurred while connecting to the AI service.";
+      }
+      client.close();
+    } catch (e) {
+      debugPrint('[DestinationService] Stream exception: $e');
+      yield "Connection lost. Please check your network.";
     }
   }
 }

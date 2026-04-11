@@ -4,10 +4,10 @@ import asyncio
 import os
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, retry_if_exception
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "gemma3:4b"
+MODEL_NAME = "gemma4:e4b"
 
 async def generate_destination_insights(name: str, country: str) -> Optional[Dict[str, Any]]:
     """
@@ -372,10 +372,18 @@ async def estimate_transport_options(
     except Exception as e:
         print(f"[AI] Gemini Transport Estimate error (attempting retry): {type(e).__name__}: {e}")
         raise e
+def _is_retryable_error(exception):
+    """Check if an error is retryable (skip 429 quota-exhausted)."""
+    error_str = str(exception).lower()
+    if '429' in error_str and 'resource_exhausted' in error_str:
+        # Don't retry quota exhaustion — it won't resolve in seconds
+        return False
+    return True
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type((Exception)),
+    retry=retry_if_exception_type((Exception)) & retry_if_exception(_is_retryable_error),
     reraise=True
 )
 async def generate_budget_insights(
@@ -455,8 +463,9 @@ async def generate_budget_insights(
     """
 
     try:
+        print(f"[AI] Budget Insights: Calling gemini-flash-latest for {city}, {country} ({duration_days} days, {budget_level})")
         response = client.models.generate_content(
-            model='gemini-2.0-flash', 
+            model='gemini-flash-latest', 
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -465,7 +474,9 @@ async def generate_budget_insights(
             )
         )
 
-        return _parse_ai_json(response.text)
+        parsed = _parse_ai_json(response.text)
+        print(f"[AI] Budget Insights: Success — keys={list(parsed.keys()) if isinstance(parsed, dict) else 'NOT_DICT'}")
+        return parsed
 
     except Exception as e:
         print(f"[AI] Gemini Budget Estimate error (attempting retry): {type(e).__name__}: {e}")
@@ -554,3 +565,70 @@ async def generate_trip_checklist(
     except Exception as e:
         print(f"[AI] Checklist generation error (attempting retry): {type(e).__name__}: {e}")
         raise e
+
+
+async def stream_chat_about_destination(
+    city: str,
+    country: str,
+    user_message: str,
+    conversation_history: list = None,
+    destination_description: str = "",
+):
+    """
+    Chat about a destination using local Ollama (gemma4:e4b), streaming the response.
+    Maintains conversation context via the passed history.
+    Yields chunks of the assistant's reply.
+    """
+    system_prompt = (
+        f"You are a friendly, knowledgeable local travel guide for {city}, {country}. "
+        f"You help travellers learn more about {city} — its culture, food, safety, transport, "
+        "local customs, hidden gems, costs, weather, visa requirements, and anything travel-related. "
+        "Keep answers concise (2-4 paragraphs max) and conversational. "
+        "Use bullet points where appropriate. "
+        f"If someone asks something unrelated to {city}, {country}, or travel, politely redirect them. "
+        "Do NOT use markdown code blocks."
+    )
+
+    if destination_description:
+        system_prompt += f"\n\nHere is the overview of {city}: {destination_description[:500]}"
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if conversation_history:
+        messages.extend(conversation_history[-20:])
+
+    messages.append({"role": "user", "content": user_message})
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            payload = {
+                "model": MODEL_NAME,
+                "messages": messages,
+                "stream": True,
+            }
+
+            print(f"[AI] Destination chat (streaming): {city} — '{user_message[:50]}...'")
+            
+            async with client.stream("POST", OLLAMA_URL, json=payload) as response:
+                if response.status_code != 200:
+                    print(f"[AI] Ollama streaming error: {response.status_code}")
+                    error_text = await response.aread()
+                    print(f"Details: {error_text.decode('utf-8')}")
+                    yield "Sorry, I am having trouble connecting to my brain right now."
+                    return
+
+                async for line in response.aiter_lines():
+                    if line:
+                        try:
+                            data = json.loads(line)
+                            chunk = data.get("message", {}).get("content", "")
+                            if chunk:
+                                yield chunk
+                        except json.JSONDecodeError:
+                            continue
+
+    except Exception as e:
+        print(f"[AI] Destination chat streaming error: {e}")
+        yield "An error occurred while generating the response."
+
+

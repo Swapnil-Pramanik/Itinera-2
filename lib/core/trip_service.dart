@@ -295,7 +295,8 @@ class TripService {
 
   // --- Checklist Methods ---
 
-  /// Fetch checklist items for a trip. Auto-initializes if none exist.
+  /// Fetch checklist items for a trip.
+  /// Items are pre-generated in the background when a trip is finalized.
   static Future<List<Map<String, dynamic>>> getChecklist(String tripId) async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return [];
@@ -307,14 +308,7 @@ class TripService {
           .eq('trip_id', tripId)
           .order('sort_order', ascending: true);
 
-      final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(response);
-      
-      if (items.isEmpty) {
-        // Auto-initialize from templates
-        return await initializeChecklist(tripId);
-      }
-      
-      return items;
+      return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       print('[TripService] getChecklist error: $e');
       return [];

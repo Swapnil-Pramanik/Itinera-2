@@ -7,6 +7,7 @@ import '../../widgets/buttons/buttons.dart';
 import '../../widgets/overlays/weather_popup.dart';
 import '../../widgets/overlays/weather_theme.dart';
 import '../timeline/timeline_selector_screen.dart';
+import '../../widgets/overlays/destination_chat_sheet.dart';
 
 /// Destination Detail Screen - Dynamic city overview with attractions
 class DestinationDetailScreen extends StatefulWidget {
@@ -830,14 +831,57 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                   const SizedBox(height: 28),
 
                   // What to expect
-                  const Text(
-                    'What to expect',
-                    style: TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'What to expect',
+                        style: TextStyle(
+                          fontFamily: 'RobotoMono',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => DestinationChatSheet(
+                              cityName: _name,
+                              countryName: _country,
+                              description: _description,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.auto_awesome, color: Colors.amber, size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Ask Itinera',
+                                style: TextStyle(
+                                  fontFamily: 'RobotoMono',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.amber.shade200,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 12),

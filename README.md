@@ -1,112 +1,123 @@
-# Itinera
+# Itinera (Version 1.0)
+The Intelligent AI Travel Ecosystem
 
-Itinera is a Flutter UI prototype for an intelligent travel-planning experience. It focuses on onboarding, itinerary generation, timeline editing, and budget estimation with a consistent Material 3 design system and custom typography.
+Itinera is a premium, beautifully crafted mobile application that transforms chaotic travel research into an orchestrated, singular timeline. Moving far beyond a static UI prototype, the Version 1 build represents a complete, full-stack application leveraging the power of cloud AI (Google Gemini) for heavy logistics, and Edge-AI (Local Ollama) for ultra-fast, local interactions, all bound by a cinematic Flutter frontend and an asynchronous Python backend.
 
-## Highlights
-- Auth + multi-step onboarding flow
-- Home dashboard with planned trips and Atlas discovery cards
-- Trip management screens (scheduled/current/completed, checklist)
-- Timeline planning flow (date selector, generation, preview, edit, final)
-- Budget estimation flow with breakdown and tips
-- Material 3 theme and reusable widgets
-- Design reference images under `assets/images/stitch_itinera/`
+---
 
-## Tech Stack
-- Flutter (SDK >= 3.0.0)
-- Material 3
-- Custom theme and Roboto Mono font
-- Pure UI/mock data (no backend services in this repo)
+## 🌟 V1 Key Highlights
 
-## Project Structure
-```
-lib/
-  main.dart
-  theme/
-  screens/
-    auth/
-    onboarding/
-    home/
-    trip/
-    timeline/
-    budget/
-  widgets/
-assets/
-  images/
-fonts/
-```
+- **Cinematic Auth & Onboarding:** Multi-step fluid onboarding utilizing responsive design, custom `RobotoMono` typography, and Supabase Authentication.
+- **The Home Dashboard:** Your customized travel hub featuring dynamic "Atlas" discovery cards, your upcoming intelligently planned trips, and persistent real-time notifications.
+- **AI-Powered Timeline Engine:** One-tap trip generation. Itinera maps out day-by-day activities across your destination. It features **dynamic re-balancing**—if you delete or skip an activity, the AI intelligently bridges the gap so your itinerary stays optimized.
+- **Local Edge-AI Destination Chat:** A frictionless, floating streaming chat interface embedded natively in the destination page. Powered by a local Ollama model (`gemma4:e4b`), users experience ChatGPT-like real-time streaming tokens with zero cloud latency and total privacy.
+- **Financial Intelligence:** Intelligent budget estimation predicting flights, food, transport, and attractions, supporting dual currencies (Local Destination Currency vs. INR).
+- **Context-Aware Pre-Trip Checklists:** Itinera analyzes your itinerary activities, local geography, and fetched weather data to automatically craft and organize a personalized packing checklist.
+- **Real-time Notifications Architecture:** A dynamic backend pipeline that instantly notifies users when their AI itinerary generations or checklist setups are complete in the background.
 
-## Getting Started
-1. Install Flutter and ensure your environment is set up.
-2. Fetch dependencies:
-   ```bash
-   flutter pub get
-   ```
-3. Run the app:
-   ```bash
-   flutter run
-   ```
+---
 
-Optional: run on a specific device (e.g. Chrome or iOS simulator):
-```bash
-flutter run -d chrome
-```
+## 🛠 Technology Stack
 
-## Tests
-```bash
-flutter test
-```
+### Frontend (Mobile App)
+- **Framework:** Flutter (Dart) — SDK >= 3.0.0
+- **Design System:** Custom "Cinematic Glassmorphism" aesthetics built on top of Material 3.
+- **State Management & Networking:** Native Flutter asynchronous streams, `http` client handling Server-Sent Events (SSE) for AI typing effects.
 
-## Navigation Flow
+### Backend (API Server)
+- **Framework:** Python + FastAPI + Uvicorn (Fully Asynchronous backend).
+- **State & Concurrency:** Stateless HTTP clients ensuring thread-safe Supabase verification preventing "deque mutated" event-loop crashes.
+
+### Database & Authentication
+- **Provider:** Supabase (PostgreSQL database, GoTrue Authentication, Row-Level Security).
+- **Architecture:** Persistent trip state syncing and notification table pipelines.
+
+### AI Tooling & External APIs
+- **Google Gemini Engine:** Powers the complex logical reasoning for Itinerary Structuring, Transport optimization (arrival/flight skip logic), and dynamic Budgets via strict JSON formatting.
+- **Local Ollama Integration:** Edge-computing framework operating `gemma4:e4b` locally for offline, private chat features.
+- **Live Travel APIs:** 
+  - *Open-Meteo* (Weather forecasting integration)
+  - *Nominatim* (Geocoding & coordinate tracking)
+  - *Unsplash API* (Dynamic heroic imagery fetching)
+  - *Wikipedia API* (Initial Atlas data dumps)
+
+---
+
+## 🗺 System Architecture Flow
+
 ```mermaid
 graph TD
-    Entry(main.dart) --> Auth[LoginSignupScreen]
+    %% Services and Devices
+    App[Itinera Flutter App]
+    FastAPI[FastAPI Python Backend]
+    SupabaseDB[(Supabase PostgreSQL)]
+    SupabaseAuth[Supabase Auth]
+    
+    %% AI Models
+    Gemini[(Google Gemini AI)]
+    Ollama[(Local Ollama Desktop)]
+
+    %% External
+    Weather[Open-Meteo / APIs]
+
+    %% App to Auth
+    App -- JWT Validation / Login --> SupabaseAuth
+    App -- API Requests + HTTP Streaming --> FastAPI
+
+    %% Backend Flows
+    FastAPI -- Reads/Writes Itineraries & Data --> SupabaseDB
+    FastAPI -- Fetches Image / Weather --> Weather
+    
+    %% AI Workflows
+    FastAPI -- Generates Itineraries & Budgets --> Gemini
+    FastAPI -- Proxies Streaming Chat --> Ollama
+```
+
+## 📱 Navigation & App Flow
+
+```mermaid
+graph TD
+    Entry(main.dart) --> Auth[Login / Signup]
 
     %% Authentication Flow
-    Auth -- Login --> Home[HomeScreen]
-    Auth -- Signup --> Onb1[Onboarding1Screen]
-
-    %% Onboarding Flow
-    Onb1 --> Onb2[Onboarding2Screen]
-    Onb2 --> Onb3[Onboarding3Screen]
-    Onb3 --> OnbComp[OnboardingCompletionScreen]
-    OnbComp --> Home
+    Auth -- Login --> Home[Home Dashboard]
+    Auth -- Signup --> Onb1[Onboarding Screens]
+    Onb1 --> Home
 
     %% Home Screen Interactions
-    Home -- Profile Icon --> Profile[ProfileScreen]
-    Profile -- Logout --> Auth
-    Home -- FAB --> Search[SearchBottomSheet]
+    Home -- FAB Search --> Search[Global Search Sheet]
+    Home -- Notification Icon --> Notifications[In-App Notifications Panel]
 
     %% Trip Management
-    Home -- Planned Trip Card --> TripSched[TripScheduledScreen]
-    TripSched -- Checklist --> TripCheck[TripChecklistScreen]
+    Home -- Planned Trip Card --> TripSched[Trip Dashboard]
+    TripSched -- Generates / Edits --> TripCheck[AI Pre-Trip Checklist]
 
     %% New Trip Planning (The Atlas)
-    Home -- Atlas Card --> DestDetail[DestinationDetailScreen]
-    DestDetail -- Plan this trip --> TimeSel[TimelineSelectorScreen]
-    TimeSel -- Generate --> TimeLoad[TimelineGenerationLoadingScreen]
-    TimeLoad -- (Delay) --> TimeInit[TimelineInitialPreviewScreen]
-
+    Home -- Atlas Card --> DestDetail[Destination Details]
+    DestDetail -- "Want to know more?" --> ChatSheet[Local AI Chat Stream]
+    DestDetail -- Plan this trip --> TimeSel[Timeline Configurator]
+    TimeSel -- Generate --> TimeLoad[AI Processing Screen]
+    
     %% Timeline Editing
-    TimeInit -- Edit --> TimeEdit[TimelineEditorScreen]
-    TimeInit -- Complete --> TimeFinal[TimelineFinalPreviewScreen]
+    TimeLoad --> TimeInit[Initial Timeline Preview]
+    TimeInit -- Edit Activity --> TimeEdit[Timeline Live Re-Balancing]
+    TimeInit -- Complete --> TimeFinal[Final Confirmation]
 
     %% Budget Estimation
-    TimeFinal -- Confirm --> BudgetLoad[BudgetLoadingScreen]
-    BudgetLoad -- (Delay) --> Budget[BudgetEstimationScreen]
+    TimeFinal -- AI Budget Request --> Budget[Smart Budget Breakdown]
     Budget -- Done --> Home
 ```
 
-## Database Schema
+---
 
-The PostgreSQL schema is located in `db/itinera_schema.sql`. See `db/SCHEMA.md` for detailed documentation.
+## 🗄 Database Schema (ERD)
 
-### Entity Relationship Diagram
+The PostgreSQL schema integrates AI outputs intrinsically into standard relational constraints.
 
 ```mermaid
 erDiagram
     users ||--o{ trips : creates
-    users ||--o{ user_preferences : has
-    users ||--o{ linked_accounts : connects
+    users ||--o{ notifications : receives
     users ||--o{ search_history : searches
     
     destinations ||--o{ attractions : contains
@@ -126,30 +137,42 @@ erDiagram
     budget_days ||--o{ expense_items : contains
 ```
 
-### Tables (17 total)
+---
 
-| Category | Tables |
-|----------|--------|
-| **Auth** | `users`, `user_preferences`, `linked_accounts` |
-| **Content** | `destinations`, `attractions`, `atlas_articles` |
-| **Trips** | `trips`, `timeline_days`, `activities` |
-| **Budget** | `budgets`, `budget_days`, `expense_items`, `budget_tips` |
-| **Checklist** | `checklist_templates`, `checklist_items` |
-| **Discovery** | `search_history`, `suggested_destinations` |
+## 🚀 Getting Started
 
-### Initialize Database
+### 1. Backend Setup
+1. Open the terminal and navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Set up your Python virtual environment and install dependencies:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. Provide your API Keys in `backend/.env`:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `GEMINI_API_KEY`
+   - `UNSPLASH_ACCESS_KEY` & `UNSPLASH_SECRET_KEY`
+4. Run the API Server:
+   ```bash
+   python main.py
+   ```
+*(Note: Ensure your local Ollama Desktop application is running in the background for the Destination Chat feature to operate).*
 
-```bash
-createdb itinera
-psql -U postgres -d itinera -f db/itinera_schema.sql
-```
+### 2. Frontend Setup
+1. Ensure your Flutter SDK is installed and configured.
+2. From the root directory:
+   ```bash
+   flutter pub get
+   ```
+3. Run the application on an emulator or real device:
+   ```bash
+   flutter run
+   ```
 
-## Assets
-- Design references: `assets/images/stitch_itinera/`
-- App logos: `assets/images/logo_black.png`, `assets/images/logo_white.png`
-- Onboarding background: `assets/images/onboarding_bg.jpg`
-- Fonts: `fonts/RobotoMono-*.ttf`
-
-## Notes
-- Entry point is `lib/main.dart` and the initial screen is `LoginSignupScreen`.
-- This repository focuses on UI flows and styling. Data shown in screens is sample data.
+---
+*Built intricately with modern architecture standards, defining the next generation of mobile travel experiences.*

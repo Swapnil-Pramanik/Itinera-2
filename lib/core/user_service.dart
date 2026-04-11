@@ -37,4 +37,23 @@ class UserService {
     if (hour < 17) return 'Good Afternoon,';
     return 'Good Evening,';
   }
+
+  /// Automatically ensures the Supabase access token is fresh before making API requests.
+  /// Prevents passing an expired JWT to the backend.
+  static Future<String?> getValidAccessToken() async {
+    final auth = Supabase.instance.client.auth;
+    var session = auth.currentSession;
+    if (session == null) return null;
+
+    if (session.isExpired) {
+      try {
+        final response = await auth.refreshSession();
+        return response.session?.accessToken;
+      } catch (e) {
+        // Token refresh failed, user might need to log in again
+        return null;
+      }
+    }
+    return session.accessToken;
+  }
 }

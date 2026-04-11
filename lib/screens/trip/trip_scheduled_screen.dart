@@ -417,28 +417,32 @@ class _TripScheduledScreenState extends State<TripScheduledScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'DAY ${day['day_number']}'.toUpperCase(),
-                    style: TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withOpacity(0.5),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DAY ${day['day_number']}'.toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
                     ),
-                  ),
-                  Text(
-                    (day['day_title'] ?? 'Exploring Area').toUpperCase(),
-                    style: const TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                    Text(
+                      (day['day_title'] ?? 'Exploring Area').toUpperCase(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'RobotoMono',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

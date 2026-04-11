@@ -11,6 +11,7 @@ import '../trip/trip_current_screen.dart';
 import '../trip/trip_completed_screen.dart';
 import '../../widgets/overlays/loading_buffer_screen.dart';
 import 'my_atlas_bottom_sheet.dart';
+import 'my_trips_bottom_sheet.dart';
 import 'profile_screen.dart';
 import 'search_bottom_sheet.dart';
 import 'notifications_bottom_sheet.dart';
@@ -183,7 +184,14 @@ class _HomeScreenState extends State<HomeScreen> {
             SectionHeader(
               title: 'MY PLANNED TRIPS',
               actionText: _trips.isNotEmpty ? 'View all' : null,
-              onActionTap: _trips.isNotEmpty ? () {} : null,
+              onActionTap: _trips.isNotEmpty ? () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const MyTripsBottomSheet(),
+                ).then((_) => _loadTrips());
+              } : null,
             ),
 
             const SizedBox(height: 16),

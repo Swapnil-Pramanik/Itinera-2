@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from datetime import datetime, timedelta
 from core.security import get_current_user
 from core.supabase import get_supabase
@@ -6,6 +6,97 @@ from models.trips import TripCreate, TripUpdate, TripResponse
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
+
+def _generate_checklist_background(trip_id: str, user_payload: dict):
+    """Background task: generates AI checklist for a finalized trip.
+    
+    Runs after the HTTP response is sent, so the user doesn't wait.
+    """
+    import asyncio
+    print(f"[BG] Starting background checklist generation for trip {trip_id}")
+    
+    try:
+        supabase = get_supabase()
+        user_id = user_payload.get("sub")
+        
+        # 1. Fetch trip and destination data
+        trip_res = (
+            supabase.table("trips")
+            .select("*, destinations(*)")
+            .eq("id", trip_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+        if not (hasattr(trip_res, "data") and trip_res.data):
+            print(f"[BG] Trip {trip_id} not found, skipping checklist generation")
+            return
+        
+        trip = trip_res.data
+        dest = trip.get("destinations")
+        if not dest:
+            print(f"[BG] No destination for trip {trip_id}, skipping checklist generation")
+            return
+        
+        # 2. Fetch itinerary context
+        itinerary_res = (
+            supabase.table("timeline_days")
+            .select("*, activities(*)")
+            .eq("trip_id", trip_id)
+            .order("day_number")
+            .execute()
+        )
+        itinerary = []
+        if hasattr(itinerary_res, "data") and itinerary_res.data:
+            for day in itinerary_res.data:
+                activities_out = []
+                for act in sorted(day.get("activities", []), key=lambda x: x.get("sort_order", 0)):
+                    activities_out.append({
+                        "title": act.get("title"),
+                        "type": act.get("category"),
+                    })
+                itinerary.append({
+                    "day_number": day.get("day_number"),
+                    "day_title": day.get("theme"),
+                    "activities": activities_out,
+                })
+        
+        # 3. Call AI checklist generation (async)
+        from core.ai import generate_trip_checklist
+        
+        checklist = asyncio.run(generate_trip_checklist(
+            city=dest["name"],
+            country=dest["country"],
+            duration_days=0,
+            start_date=trip.get("start_date") or "",
+            itinerary=itinerary,
+            departure_city=trip.get("departure_city") or "New Delhi"
+        ))
+        
+        if not checklist:
+            print(f"[BG] AI returned empty checklist for trip {trip_id}")
+            return
+        
+        # 4. Save to checklist_items (clear any existing first)
+        supabase.table("checklist_items").delete().eq("trip_id", trip_id).execute()
+        
+        items_to_insert = []
+        for i, item in enumerate(checklist):
+            items_to_insert.append({
+                "trip_id": trip_id,
+                "category": item.get("category", "ESSENTIALS"),
+                "label": item.get("label"),
+                "is_completed": False,
+                "sort_order": i
+            })
+        
+        if items_to_insert:
+            supabase.table("checklist_items").insert(items_to_insert).execute()
+        
+        print(f"[BG] ✅ Checklist generated successfully for trip {trip_id}: {len(items_to_insert)} items")
+    
+    except Exception as e:
+        print(f"[BG] ❌ Background checklist generation failed for trip {trip_id}: {e}")
 
 @router.get("/me")
 def get_my_trips(user_payload: dict = Depends(get_current_user)):
@@ -94,7 +185,7 @@ def get_trip_by_id(trip_id: str, user_payload: dict = Depends(get_current_user))
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found")
 
 @router.put("/{trip_id}", response_model=TripResponse)
-def update_trip(trip_id: str, trip: TripUpdate, user_payload: dict = Depends(get_current_user)):
+def update_trip(trip_id: str, trip: TripUpdate, background_tasks: BackgroundTasks, user_payload: dict = Depends(get_current_user)):
     """Update an existing trip."""
     user_id = user_payload.get("sub")
     supabase = get_supabase()
@@ -126,6 +217,9 @@ def update_trip(trip_id: str, trip: TripUpdate, user_payload: dict = Depends(get
     try:
         response = supabase.table("trips").update(update_data).eq("id", trip_id).execute()
         if hasattr(response, "data") and response.data:
+            # If trip is being finalized (PLANNED), kick off checklist generation in background
+            if trip.status == "PLANNED":
+                background_tasks.add_task(_generate_checklist_background, trip_id, user_payload)
             return response.data[0]
         raise HTTPException(status_code=500, detail="Failed to update trip")
     except Exception as e:
