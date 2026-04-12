@@ -392,6 +392,27 @@ async def get_destination_by_name(
 
 
 # ──────────────────────────────────────────────
+# 4.5 Get local weather by coordinates
+# ──────────────────────────────────────────────
+
+@router.get("/local/weather")
+async def get_local_weather(
+    lat: float = Query(..., description="Latitude"),
+    lon: float = Query(..., description="Longitude"),
+    user_payload: dict = Depends(get_current_user),
+):
+    """Fetch current and forecasted weather for arbitrary coordinates."""
+    weather_data = await get_weather_forecast(lat=lat, lon=lon)
+    
+    if weather_data:
+        return weather_data
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
+            detail="Weather service unavailable"
+        )
+
+# ──────────────────────────────────────────────
 # 5. Get weather by destination ID
 # ──────────────────────────────────────────────
 

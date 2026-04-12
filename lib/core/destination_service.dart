@@ -185,8 +185,38 @@ class DestinationService {
     return null;
   }
 
+  /// Get local weather by coordinates.
+  static Future<Map<String, dynamic>?> getLocalWeather(double lat, double lon) async {
+    await UserService.getValidAccessToken();
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return null;
+
+    try {
+      final url = '$_backendUrl/api/destinations/local/weather?lat=$lat&lon=$lon';
+      debugPrint('[DestinationService] Fetching local weather from: $url');
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map) return Map<String, dynamic>.from(data);
+      } else {
+        debugPrint('[DestinationService] Failed to fetch local weather: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('[DestinationService] Error fetching local weather: $e');
+    }
+    return null;
+  }
+
   /// Fetch atlas articles for home screen.
   static Future<List<Map<String, dynamic>>> getAtlasArticles() async {
+    await UserService.getValidAccessToken();
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return [];
 
@@ -260,6 +290,7 @@ class DestinationService {
   }
   /// Fetch the actual recent destinations that were fetched and cached in the DB for THIS user.
   static Future<List<Map<String, dynamic>>> getRecentDestinations() async {
+    await UserService.getValidAccessToken();
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return [];
 

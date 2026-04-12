@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import '../overlays/weather_popup.dart';
+import '../overlays/weather_theme.dart';
 
 /// Home screen app bar with logo, weather, and menu
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onMenuTap;
   final VoidCallback? onNotificationsTap;
-  final String? temperature;
+  final Map<String, dynamic>? weatherData;
+  final String? locationName;
   final bool hasNotifications;
 
   const HomeAppBar({
     super.key,
     this.onMenuTap,
     this.onNotificationsTap,
-    this.temperature,
+    this.weatherData,
+    this.locationName,
     this.hasNotifications = false,
   });
 
@@ -40,22 +44,8 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           const Spacer(),
-          if (temperature != null) ...[
-            Icon(
-              Icons.wb_sunny_outlined,
-              size: 18,
-              color: Colors.grey.shade600,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              temperature!,
-              style: TextStyle(
-                fontFamily: 'RobotoMono',
-                fontSize: 14,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
+          if (weatherData != null && locationName != null)
+            _buildWeatherChip(context),
         ],
       ),
       actions: [
@@ -113,6 +103,91 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildWeatherChip(BuildContext context) {
+    final current = weatherData!['current'];
+    final code = current?['weather_code'];
+    final temp = current?['temperature_2m']?.round()?.toString() ?? '--';
+    
+    final theme = WeatherThemeMapper.getTheme(code);
+    
+    String label = '$temp°';
+    
+    Widget chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: theme.cardGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: theme.cardGradient.last.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          )
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(theme.icon, size: 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'RobotoMono',
+              fontSize: 14,
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final heroTag = 'home-weather-hero';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            opaque: false,
+            barrierDismissible: true,
+            transitionDuration: const Duration(milliseconds: 700),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
+            pageBuilder: (context, animation, secondaryAnimation) => WeatherPopup(
+              locationName: locationName!,
+              weatherData: weatherData!,
+              heroTag: heroTag,
+            ),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return ScaleTransition(
+                scale: CurvedAnimation(
+                  parent: animation,
+                  curve: animation.status == AnimationStatus.forward
+                      ? Curves.easeOutBack
+                      : Curves.easeInBack,
+                ),
+                child: child,
+              );
+            },
+          ),
+        );
+      },
+      child: Hero(
+        tag: heroTag,
+        placeholderBuilder: (context, size, widget) => widget,
+        flightShuttleBuilder: (flightContext, animation, flightDirection, fromHeroContext, toHeroContext) {
+          return toHeroContext.widget;
+        },
+        child: Material(color: Colors.transparent, child: chip),
+      ),
     );
   }
 }

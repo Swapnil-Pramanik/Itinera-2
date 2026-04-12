@@ -49,19 +49,15 @@ class _BudgetEstimationScreenState extends State<BudgetEstimationScreen> {
       _budgetData = widget.preloadedBudget;
     }
     
-    // Fetch trip data for the header/image
-    final trips = await TripService.getMyTrips();
-    final currentTrip = trips.firstWhere(
-      (t) => t['id'] == widget.tripId, 
-      orElse: () => <String, dynamic>{}
-    );
+    // Fetch trip data for the header/image using dedicated endpoint
+    final currentTrip = await TripService.getTripById(widget.tripId);
     
     // Only fetch deep budget insights if not pre-fetched
     final budget = widget.preloadedBudget ?? await BudgetService.getTripBudget(widget.tripId);
     
     if (mounted) {
       setState(() {
-        _tripData = currentTrip;
+        _tripData = currentTrip ?? <String, dynamic>{};
         _budgetData = budget;
         _isLoading = false;
       });

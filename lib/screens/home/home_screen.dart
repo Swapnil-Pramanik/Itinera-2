@@ -16,6 +16,7 @@ import 'profile_screen.dart';
 import 'search_bottom_sheet.dart';
 import 'notifications_bottom_sheet.dart';
 import '../../core/notification_service.dart';
+import '../../core/location_service.dart';
 
 /// Home Screen - Main dashboard with trips and atlas
 class HomeScreen extends StatefulWidget {
@@ -31,6 +32,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingTrips = true;
   bool _isLoadingAtlas = true;
   int _unreadNotificationsCount = 0;
+  
+  Map<String, dynamic>? _weatherData;
+  String? _locationName;
 
   final PageController _pageController = PageController(viewportFraction: 0.85);
 
@@ -40,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadTrips();
     _loadAtlasArticles();
     _loadNotificationCount();
+    _loadLocalWeather();
   }
 
   @override
@@ -130,12 +135,32 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {}
   }
 
+  Future<void> _loadLocalWeather() async {
+    final location = await LocationService.getCurrentLocation();
+    if (location != null && mounted) {
+      final city = location['city'];
+      final lat = location['lat'];
+      final lon = location['lon'];
+      
+      if (lat != null && lon != null) {
+        final weather = await DestinationService.getLocalWeather(lat, lon);
+        if (weather != null && mounted) {
+          setState(() {
+            _locationName = city ?? 'Current Location';
+            _weatherData = weather;
+          });
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: HomeAppBar(
-        temperature: '--',
+        weatherData: _weatherData,
+        locationName: _locationName,
         hasNotifications: _unreadNotificationsCount > 0,
         onNotificationsTap: () {
           showModalBottomSheet(
