@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/trip_service.dart';
+import '../../core/destination_service.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/buttons/buttons.dart';
+import '../../widgets/overlays/destination_chat_sheet.dart';
+import '../../widgets/overlays/weather_popup.dart';
+import '../../widgets/overlays/weather_theme.dart';
 
 /// Trip Current Screen - Active trip dashboard with "Now" focus (Dark Theme)
 class TripCurrentScreen extends StatefulWidget {
@@ -16,6 +21,8 @@ class TripCurrentScreen extends StatefulWidget {
 class _TripCurrentScreenState extends State<TripCurrentScreen> {
   Map<String, dynamic>? _trip;
   List<Map<String, dynamic>> _itinerary = [];
+  Map<String, dynamic>? _weatherData;
+  final Set<String> _completedActivities = {};
   bool _isLoading = true;
   String? _error;
 
@@ -37,6 +44,24 @@ class _TripCurrentScreenState extends State<TripCurrentScreen> {
           _isLoading = false;
           if (_trip == null) _error = 'Trip not found';
         });
+      }
+
+      // Fetch weather if location is available
+      if (tripData != null && tripData['destinations'] != null) {
+        final dest = tripData['destinations'];
+        final lat = dest['latitude'];
+        final lon = dest['longitude'];
+        if (lat != null && lon != null) {
+          final weather = await DestinationService.getLocalWeather(
+            (lat as num).toDouble(),
+            (lon as num).toDouble(),
+          );
+          if (mounted && weather != null) {
+            setState(() {
+              _weatherData = weather;
+            });
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -205,47 +230,102 @@ class _TripCurrentScreenState extends State<TripCurrentScreen> {
                         ),
                       ),
                       const Spacer(),
-                      const Icon(Icons.wb_sunny_outlined, size: 16, color: Colors.white70),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '24°C',
-                        style: TextStyle(
-                          fontFamily: 'RobotoMono',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white70,
-                        ),
-                      ),
+                      if (_weatherData != null) _buildWeatherBadge(),
                     ],
                   ),
                   const SizedBox(height: 24),
 
-                  // Map Placeholder (Dark style)
-                  Container(
-                    height: 180,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5),
-                    ),
-                    child: Stack(
-                      children: [
-                        const Center(
-                          child: Icon(Icons.map_outlined, size: 40, color: Colors.white24),
+                  // Aerial Visual Card (Map)
+                  GestureDetector(
+                    onTap: () async {
+                      final dests = _trip?['destinations'];
+                      if (dests != null) {
+                        final lat = dests['latitude'];
+                        final lon = dests['longitude'];
+                        if (lat != null && lon != null) {
+                          final mapUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lon');
+                          if (await canLaunchUrl(mapUrl)) {
+                            await launchUrl(mapUrl);
+                          }
+                        }
+                      }
+                    },
+                    child: Container(
+                      height: 250,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade900,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: 'https://api.maptiler.com/maps/basic-v2/static/${_trip?['destinations']?['longitude'] ?? 73.8567},${_trip?['destinations']?['latitude'] ?? 18.5204},12/600x400@2x.png?key=GfuxUc0Qb7MFssVNEWXu&markers=${_trip?['destinations']?['longitude'] ?? 73.8567},${_trip?['destinations']?['latitude'] ?? 18.5204}',
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(color: Colors.grey.shade900, child: const Center(child: CircularProgressIndicator())),
+                              errorWidget: (context, url, error) => CachedNetworkImage(
+                                imageUrl: 'https://maps.googleapis.com/maps/api/staticmap?center=${_trip?['destinations']?['latitude'] ?? 18.5204},${_trip?['destinations']?['longitude'] ?? 73.8567}&zoom=13&size=600x400',
+                                fit: BoxFit.cover,
+                                errorWidget: (context, url, error) => CachedNetworkImage(
+                                  imageUrl: 'https://static-maps.yandex.ru/1.x/?lang=en_US&ll=${_trip?['destinations']?['longitude'] ?? 73.8567},${_trip?['destinations']?['latitude'] ?? 18.5204}&size=600,400&z=12&l=map&pt=${_trip?['destinations']?['longitude'] ?? 73.8567},${_trip?['destinations']?['latitude'] ?? 18.5204},pmwtm1',
+                                  fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) => CachedNetworkImage(
+                                    imageUrl: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?q=80&w=2070&auto=format&fit=crop', // High-fidelity aerial city fallback
+                                    fit: BoxFit.cover,
+                                    color: Colors.black.withOpacity(0.4),
+                                    colorBlendMode: BlendMode.darken,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Dark Navigation Badge
+                            Positioned(
+                              right: 20,
+                              bottom: 20,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.white10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.4),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/map_16509523.png',
+                                      width: 16,
+                                      height: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'GOOGLE MAPS',
+                                      style: TextStyle(
+                                        fontFamily: 'RobotoMono',
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        Positioned(
-                          left: 16,
-                          bottom: 16,
-                          child: PrimaryButton(
-                            text: 'OPEN MAPS',
-                            onPressed: () {},
-                            showArrow: false,
-                            width: 140,
-                            height: 44,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
 
@@ -275,7 +355,21 @@ class _TripCurrentScreenState extends State<TripCurrentScreen> {
                   const SizedBox(height: 24),
 
                   // AI Input - The common AiInputBar already has some white background, but I'll make it fit
-                  const AiInputBar(hintText: 'Ask Itinera to find food nearby...'),
+                  AiInputBar(
+                    hintText: 'Ask Itinera to find food nearby...',
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => DestinationChatSheet(
+                          cityName: _title,
+                          countryName: _country,
+                          description: _trip?['notes'] ?? '',
+                        ),
+                      );
+                    },
+                  ),
                   
                   const SizedBox(height: 100),
                 ],
@@ -297,6 +391,89 @@ class _TripCurrentScreenState extends State<TripCurrentScreen> {
         boxShadow: [
           BoxShadow(color: Colors.redAccent, blurRadius: 4, spreadRadius: 1),
         ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherBadge() {
+    final current = _weatherData!['current'];
+    final code = current?['weather_code'];
+    final temp = current?['temperature_2m']?.round()?.toString() ?? '--';
+    
+    final theme = WeatherThemeMapper.getTheme(code);
+    final heroTag = 'trip-weather-hero';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            opaque: false,
+            barrierDismissible: true,
+            transitionDuration: const Duration(milliseconds: 700),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
+            pageBuilder: (context, animation, secondaryAnimation) => WeatherPopup(
+              locationName: _title,
+              weatherData: _weatherData!,
+              heroTag: heroTag,
+            ),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return ScaleTransition(
+                scale: CurvedAnimation(
+                  parent: animation,
+                  curve: animation.status == AnimationStatus.forward
+                      ? Curves.easeOutBack
+                      : Curves.easeInBack,
+                ),
+                child: child,
+              );
+            },
+          ),
+        );
+      },
+      child: Hero(
+        tag: heroTag,
+        placeholderBuilder: (context, size, widget) => widget,
+        flightShuttleBuilder: (flightContext, animation, flightDirection, fromHeroContext, toHeroContext) {
+          return toHeroContext.widget;
+        },
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: theme.cardGradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.cardGradient.last.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(theme.icon, size: 16, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(
+                  '$temp°C',
+                  style: const TextStyle(
+                    fontFamily: 'RobotoMono',
+                    fontSize: 12,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -366,8 +543,22 @@ class _TripCurrentScreenState extends State<TripCurrentScreen> {
           ),
           const SizedBox(width: 12),
           IconButton(
-            onPressed: () {},
-            icon: Icon(Icons.check_circle_outline, color: Colors.white.withOpacity(0.2)),
+            onPressed: () {
+              setState(() {
+                final activityId = activity['title'] ?? activity.hashCode.toString();
+                if (_completedActivities.contains(activityId)) {
+                  _completedActivities.remove(activityId);
+                } else {
+                  _completedActivities.add(activityId);
+                }
+              });
+            },
+            icon: Icon(
+              Icons.check_circle_outline,
+              color: _completedActivities.contains(activity['title'] ?? activity.hashCode.toString())
+                  ? Colors.greenAccent
+                  : Colors.white.withOpacity(0.2),
+            ),
           ),
         ],
       ),
