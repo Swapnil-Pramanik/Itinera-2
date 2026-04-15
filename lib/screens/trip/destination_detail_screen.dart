@@ -8,6 +8,7 @@ import '../../widgets/overlays/weather_popup.dart';
 import '../../widgets/overlays/weather_theme.dart';
 import '../timeline/timeline_selector_screen.dart';
 import '../../widgets/overlays/destination_chat_sheet.dart';
+import '../../widgets/inputs/rating_stars.dart';
 
 /// Destination Detail Screen - Dynamic city overview with attractions
 class DestinationDetailScreen extends StatefulWidget {
@@ -36,6 +37,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   Map<String, dynamic>? _weather;
   bool _isLoading = true;
   String? _error;
+  int? _userRating;
 
   final ScrollController _scrollController = ScrollController();
   bool _isCollapsed = false;
@@ -57,6 +59,21 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     if (widget.preloadedData != null) {
       _data = widget.preloadedData;
       _isLoading = false;
+      
+      if (_data?['id'] != null) {
+        _fetchUserRating(_data!['id']);
+      }
+
+      // If data is preloaded but incomplete (missing attractions or daily cost),
+      // we still fetch the full details in the background to ensure it populates
+      // as soon as the first-visit enrichment finishes on the backend.
+      final hasAttractions = (_data!['attractions'] as List? ?? []).isNotEmpty;
+      final hasBudget = _data!['estimated_daily_cost_usd'] != null;
+      
+      if (!hasAttractions || !hasBudget) {
+        debugPrint('[Detail] Preloaded data incomplete, triggering deep fetch in background...');
+        _fetchDetails(); 
+      }
     } else {
       _fetchDetails();
     }
@@ -80,8 +97,12 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
         setState(() {
           _data = data;
           _isLoading = false;
-          if (data == null) _error = 'Could not load destination details';
+          _error = (data == null && _data == null) ? 'Could not load destination details' : null;
         });
+        
+        if (data?['id'] != null) {
+          _fetchUserRating(data!['id']);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -90,6 +111,43 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           _error = 'Failed to load: $e';
         });
       }
+    }
+  }
+
+  Future<void> _fetchUserRating(String destinationId) async {
+    final rating = await DestinationService.getUserRating(destinationId);
+    if (mounted) {
+      setState(() => _userRating = rating);
+    }
+  }
+
+  Future<void> _handleRate(int rating) async {
+    if (_data?['id'] == null) return;
+    
+    // Optimistic UI update
+    final oldRating = _userRating;
+    setState(() => _userRating = rating);
+
+    final success = await DestinationService.rateDestination(_data!['id'], rating);
+    
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'RATING SAVED: $rating STARS',
+            style: const TextStyle(fontFamily: 'RobotoMono', color: Colors.white, fontSize: 12),
+          ),
+          backgroundColor: Colors.black87,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else if (mounted) {
+      // Revert if failed
+      setState(() => _userRating = oldRating);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save rating.')),
+      );
     }
   }
 
@@ -608,11 +666,16 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          CustomScrollView(
-        controller: _scrollController,
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () => _fetchDetails(),
+        color: Colors.white,
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            CustomScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // Hero image app bar
           SliverAppBar(
             expandedHeight: 280,
@@ -702,6 +765,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                             color: Colors.white,
                           ),
                         ),
+
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -895,7 +959,69 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
+
+                  // Interactive Rating Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withOpacity(0.06)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _userRating != null ? 'YOUR RATING' : 'RATE THIS PLACE',
+                              style: TextStyle(
+                                fontFamily: 'RobotoMono',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white.withOpacity(0.4),
+                                letterSpacing: 2,
+                              ),
+                            ),
+                            if (_userRating != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.greenAccent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'SAVED',
+                                  style: TextStyle(fontSize: 9, color: Colors.greenAccent, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        RatingStars(
+                          initialRating: _userRating ?? 0,
+                          onRatingChanged: _handleRate,
+                          starSize: 32,
+                          alignment: MainAxisAlignment.start,
+                        ),
+                        if (_userRating == null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Tap a star to share your experience.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.3),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
 
                   // Top attractions
                   Row(
@@ -970,11 +1096,37 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                                 errorWidget: (context, url, error) => CachedNetworkImage(
                                   imageUrl: 'https://static-maps.yandex.ru/1.x/?lang=en_US&ll=${widget.longitude ?? _data?['longitude'] ?? 73.8567},${widget.latitude ?? _data?['latitude'] ?? 18.5204}&size=600,400&z=12&l=map&pt=${widget.longitude ?? _data?['longitude'] ?? 73.8567},${widget.latitude ?? _data?['latitude'] ?? 18.5204},pmwtm1',
                                   fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) => CachedNetworkImage(
-                                    imageUrl: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?q=80&w=2070&auto=format&fit=crop', // High-fidelity aerial city fallback
-                                    fit: BoxFit.cover,
-                                    color: Colors.black.withOpacity(0.4),
-                                    colorBlendMode: BlendMode.darken,
+                                  errorWidget: (context, url, error) => Container(
+                                    color: const Color(0xFF0F0F0F),
+                                    child: Stack(
+                                      children: [
+                                        CustomPaint(
+                                          painter: GridPainter(
+                                            gridColor: Colors.white.withOpacity(0.03),
+                                            spacing: 30,
+                                          ),
+                                          size: Size.infinite,
+                                        ),
+                                        Center(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.map_outlined, color: Colors.white.withOpacity(0.1), size: 48),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                'MAP VISUAL UNAVAILABLE',
+                                                style: TextStyle(
+                                                  fontFamily: 'RobotoMono',
+                                                  fontSize: 10,
+                                                  color: Colors.white.withOpacity(0.2),
+                                                  letterSpacing: 2,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1086,6 +1238,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           ),
         ],
       ),
+    ),
 
       // Bottom bar
       bottomNavigationBar: Container(
@@ -1360,4 +1513,29 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     }
     return count.toString();
   }
+}
+
+class GridPainter extends CustomPainter {
+  final Color gridColor;
+  final double spacing;
+
+  GridPainter({required this.gridColor, required this.spacing});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1.0;
+
+    for (double i = 0; i < size.width; i += spacing) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
+    }
+
+    for (double i = 0; i < size.height; i += spacing) {
+      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

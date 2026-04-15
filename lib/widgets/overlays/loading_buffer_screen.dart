@@ -80,7 +80,17 @@ class _LoadingBufferScreenState extends State<LoadingBufferScreen> with TickerPr
         lon: widget.longitude,
       );
 
-      _preloadedData = data;
+      // Validate data: If it's missing deep info (like attractions or coords),
+      // we treat it as "incomplete" so the detail screen can trigger a fresh fetch.
+      if (data != null && 
+          data['latitude'] != null && 
+          data['longitude'] != null && 
+          (data['attractions'] as List? ?? []).isNotEmpty) {
+        _preloadedData = data;
+      } else {
+        debugPrint('[LoadingBuffer] Data incomplete or coordinates missing, passing null to force deep fetch in detail screen.');
+        _preloadedData = null; 
+      }
       
       // Snap progress to completion
       if (mounted) {
@@ -88,6 +98,7 @@ class _LoadingBufferScreenState extends State<LoadingBufferScreen> with TickerPr
       }
     } catch (e) {
       debugPrint('[LoadingBuffer] Error fetching data: $e');
+      _preloadedData = null;
     }
 
     // 2. Minimum wait for cinematic effect AND progress snap

@@ -141,38 +141,81 @@ erDiagram
 
 ## 🚀 Getting Started
 
-### 1. Backend Setup
-1. Open the terminal and navigate to the backend directory:
+### 1. Prerequisites
+Before setting up Itinera, ensure you have the following installed:
+- **Flutter SDK** (>= 3.0.0)
+- **Python** (3.9+)
+- **Ollama** (For local edge-AI)
+- **Supabase Account** (For database and auth)
+
+---
+
+### 2. Database Initialization (Supabase)
+Itinera uses Supabase as its primary data store. Follow these steps to set up your database:
+
+1. Create a new project in the **Supabase Dashboard**.
+2. Open the **SQL Editor** in the side navigation.
+3. Execute the following SQL scripts (found in the `db/` directory) in this order:
+   - `db/itinera_schema.sql`: Core relational structure.
+   - `db/sync_auth_users.sql`: Triggers to sync Supabase Auth users with our native profiles.
+   - `db/rating_schema.sql`: Interactive destination rating feature logic.
+
+---
+
+### 3. AI Setup
+Itinera leverages a hybrid AI model architecture.
+
+#### Cloud AI (Gemini)
+1. Go to **Google AI Studio** and generate a free API key for **Gemini 1.5 Flash**.
+2. Add this to your `backend/.env` file.
+
+#### Edge AI (Local Ollama)
+1. Download [Ollama](https://ollama.com).
+2. From your terminal, pull the required model:
+   ```bash
+   ollama pull gemma:2b
+   ```
+3. Keep the Ollama application running in the background while using the app.
+
+---
+
+### 4. Backend Configuration
+1. Navigate to the backend directory:
    ```bash
    cd backend
    ```
-2. Set up your Python virtual environment and install dependencies:
+2. Set up a virtual environment and install dependencies:
    ```bash
    python -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
    ```
-3. Provide your API Keys in `backend/.env`:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `GEMINI_API_KEY`
-   - `UNSPLASH_ACCESS_KEY` & `UNSPLASH_SECRET_KEY`
-4. Run the API Server:
+3. Create/Edit `backend/.env` with your credentials:
+   ```env
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_ANON_KEY=your_anon_key
+   GEMINI_API_KEY=your_gemini_key
+   UNSPLASH_ACCESS_KEY=your_unsplash_key
+   ```
+4. Start the server:
    ```bash
    python main.py
    ```
-*(Note: Ensure your local Ollama Desktop application is running in the background for the Destination Chat feature to operate).*
-
-### 2. Frontend Setup
-1. Ensure your Flutter SDK is installed and configured.
-2. From the root directory:
-   ```bash
-   flutter pub get
-   ```
-3. Run the application on an emulator or real device:
-   ```bash
-   flutter run
-   ```
+   *Note: The server is configured to bind to `0.0.0.0`, allowing connections from physical devices on your network.*
 
 ---
-*Built intricately with modern architecture standards, defining the next generation of mobile travel experiences.*
+
+### 5. Wireless Hosting & Mobile App
+To run Itinera on a **physical phone** while hosting the backend on your computer:
+
+1. **Find your local IP**: Run `ipconfig getifaddr en0` on your Mac.
+2. **Update Pointer**: In `lib/core/constants.dart`, update the `backendUrl` to your Mac's IP (e.g., `http://192.168.1.5:8000`).
+3. **Build APK**:
+   ```bash
+   flutter build apk --debug
+   ```
+4. **Share wirelessly**: Run `python3 -m http.server 8080` in the build output directory and visit that address on your phone's browser to download.
+
+---
+
+*Built with ❤️ for the next generation of travelers.*

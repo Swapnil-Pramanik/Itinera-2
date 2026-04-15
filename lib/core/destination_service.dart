@@ -437,4 +437,50 @@ class DestinationService {
       yield "Connection lost. Please check your network.";
     }
   }
+
+  /// Submit a rating (1-5) for a destination.
+  static Future<bool> rateDestination(String destinationId, int rating) async {
+    final token = await UserService.getValidAccessToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_backendUrl/api/destinations/$destinationId/rate'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'rating': rating}),
+      ).timeout(const Duration(seconds: 10));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[DestinationService] Error rating destination: $e');
+      return false;
+    }
+  }
+
+  /// Get the current user's rating for a destination.
+  static Future<int?> getUserRating(String destinationId) async {
+    final token = await UserService.getValidAccessToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_backendUrl/api/destinations/$destinationId/user-rating'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['rating'] as int?;
+      }
+    } catch (e) {
+      debugPrint('[DestinationService] Error getting user rating: $e');
+    }
+    return null;
+  }
 }

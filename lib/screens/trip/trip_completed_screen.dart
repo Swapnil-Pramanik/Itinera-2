@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/trip_service.dart';
 import '../../widgets/buttons/buttons.dart';
+import '../../widgets/inputs/rating_stars.dart';
+import '../../core/destination_service.dart';
 
 /// Trip Completed Screen - Nostalgic trip summary (Dark Theme)
 class TripCompletedScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
   List<Map<String, dynamic>> _itinerary = [];
   bool _isLoading = true;
   String? _error;
+  int? _userRating;
 
   @override
   void initState() {
@@ -37,6 +40,10 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
           _isLoading = false;
           if (_trip == null) _error = 'Trip not found';
         });
+        
+        if (_trip?['destination_id'] != null) {
+          _fetchUserRating(_trip!['destination_id']);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -45,6 +52,31 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
           _error = 'Failed to load trip: $e';
         });
       }
+    }
+  }
+
+  Future<void> _fetchUserRating(String destinationId) async {
+    final rating = await DestinationService.getUserRating(destinationId);
+    if (mounted) {
+      setState(() => _userRating = rating);
+    }
+  }
+
+  Future<void> _handleRate(int rating) async {
+    final destId = _trip?['destination_id'];
+    if (destId == null) return;
+    
+    setState(() => _userRating = rating);
+    await DestinationService.rateDestination(destId, rating);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('THANK YOU FOR RATING ${rating} STARS!', style: const TextStyle(fontFamily: 'RobotoMono', fontSize: 12)),
+          backgroundColor: Colors.black87,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -245,6 +277,11 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
                   else
                     const Text('No memories recorded.', style: TextStyle(color: Colors.white24)),
 
+                  const SizedBox(height: 48),
+
+                  // Rating Prompt
+                  _buildRatingCard(),
+
                   const SizedBox(height: 40),
 
                   PrimaryButton(
@@ -355,6 +392,51 @@ class _TripCompletedScreenState extends State<TripCompletedScreen> {
                 )),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRatingCard() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: Colors.amber.withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.auto_awesome, color: Colors.amber, size: 32),
+          const SizedBox(height: 16),
+          Text(
+            _userRating != null ? 'TRIP RATED' : 'RATE YOUR EXPERIENCE',
+            style: const TextStyle(
+              fontFamily: 'RobotoMono',
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _userRating != null 
+                ? 'Thanks for sharing your thoughts on ${_title}!' 
+                : 'How was your time in ${_title}? Your feedback helps other explorers.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withOpacity(0.6),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          RatingStars(
+            initialRating: _userRating ?? 0,
+            onRatingChanged: _handleRate,
+            starSize: 32,
           ),
         ],
       ),

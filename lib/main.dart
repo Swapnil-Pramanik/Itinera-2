@@ -6,6 +6,8 @@ import 'theme/material3_theme.dart';
 import 'screens/auth/login_signup_screen.dart';
 import 'screens/home/home_screen.dart';
 
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -37,6 +39,7 @@ class ItineraApp extends StatelessWidget {
       title: 'Itinera',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      navigatorObservers: [routeObserver],
       home: session != null ? const HomeScreen() : const LoginSignupScreen(),
     );
   }

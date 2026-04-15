@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../../main.dart';
 import '../../core/user_service.dart';
 import '../../core/trip_service.dart';
 import '../../core/destination_service.dart';
@@ -26,7 +27,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with RouteAware {
   List<Map<String, dynamic>> _trips = [];
   List<Map<String, dynamic>> _recentDestinations = [];
   bool _isLoadingTrips = true;
@@ -48,9 +49,46 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when the top route has been popped off, and this route shows up as the top route.
+    _refreshAll(showLoading: false);
+  }
+
+  Future<void> _refreshAll({bool showLoading = false}) async {
+    if (showLoading) {
+      setState(() {
+        _isLoadingTrips = true;
+        _isLoadingAtlas = true;
+      });
+    }
+
+    // Run all refreshes in parallel for better performance
+    await Future.wait([
+      _loadTrips(),
+      _loadAtlasArticles(),
+      _loadNotificationCount(),
+      _loadLocalWeather(),
+    ]);
+
+    if (showLoading && mounted) {
+      setState(() {
+        _isLoadingTrips = false;
+        _isLoadingAtlas = false;
+      });
+    }
   }
 
   Future<void> _loadTrips() async {
@@ -177,65 +215,71 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
+      body: RefreshIndicator(
+        onRefresh: () => _refreshAll(showLoading: false),
+        color: Colors.black,
+        backgroundColor: Colors.white,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
 
-            // Greeting
-            Text(
-              UserService.getGreeting(),
-              style: TextStyle(
-                fontFamily: 'RobotoMono',
-                fontSize: 28,
-                fontWeight: FontWeight.w300,
-                color: Colors.grey.shade800,
+              // Greeting
+              Text(
+                UserService.getGreeting(),
+                style: TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 28,
+                  fontWeight: FontWeight.w300,
+                  color: Colors.grey.shade800,
+                ),
               ),
-            ),
-            Text(
-              UserService.getDisplayName(),
-              style: const TextStyle(
-                fontFamily: 'RobotoMono',
-                fontSize: 32,
-                fontWeight: FontWeight.w600,
+              Text(
+                UserService.getDisplayName(),
+                style: const TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 32,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // My Planned Trips section
-            SectionHeader(
-              title: 'MY PLANNED TRIPS',
-              actionText: _trips.isNotEmpty ? 'View all' : null,
-              onActionTap: _trips.isNotEmpty ? () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => const MyTripsBottomSheet(),
-                ).then((_) => _loadTrips());
-              } : null,
-            ),
+              // My Planned Trips section
+              SectionHeader(
+                title: 'MY PLANNED TRIPS',
+                actionText: _trips.isNotEmpty ? 'View all' : null,
+                onActionTap: _trips.isNotEmpty ? () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => const MyTripsBottomSheet(),
+                  ).then((_) => _refreshAll(showLoading: false));
+                } : null,
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Dynamic trip cards or empty state
-            _buildTripsSection(),
+              // Dynamic trip cards or empty state
+              _buildTripsSection(),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // The Atlas section
-            const SectionHeader(title: 'MY ATLAS'),
+              // The Atlas section
+              const SectionHeader(title: 'MY ATLAS'),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Atlas content
-            _buildAtlasSection(),
+              // Atlas content
+              _buildAtlasSection(),
 
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,

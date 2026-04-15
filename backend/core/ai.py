@@ -42,7 +42,8 @@ async def generate_destination_insights(name: str, country: str) -> Optional[Dic
     """
 
     try:
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        # Fix: Increased timeout to 300s to allow local LLM sufficient time to run
+        async with httpx.AsyncClient(timeout=300.0) as client:
             payload = {
                 "model": MODEL_NAME,
                 "messages": [
@@ -600,7 +601,8 @@ async def stream_chat_about_destination(
     messages.append({"role": "user", "content": user_message})
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # Fix: Increased timeout to 180s to prevent broken pipe for local AI startup latency
+        async with httpx.AsyncClient(timeout=180.0) as client:
             payload = {
                 "model": MODEL_NAME,
                 "messages": messages,

@@ -8,7 +8,7 @@ import os
 from core.weather import get_weather_forecast
 from core.ai import generate_destination_insights
 from datetime import datetime, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -265,91 +265,31 @@ async def get_destination_by_name(
         )
         if hasattr(response, "data") and len(response.data) > 0:
             dest = response.data[0]
-            needs_update = False
             
-            # Update missing coordinates if provided or through lookup
-            current_lat = dest.get("latitude")
-            current_lon = dest.get("longitude")
-            
-            if current_lat is None or current_lon is None:
-                if lat is not None and lon is not None:
-                    dest["latitude"] = lat
-                    dest["longitude"] = lon
-                    needs_update = True
-                else:
-                    # Recovery: lookup coords via Nominatim
-                    coords = await _fetch_nominatim_coords(name, country)
-                    if coords:
-                        dest["latitude"] = coords["lat"]
-                        dest["longitude"] = coords["lon"]
-                        needs_update = True
-            
-            # Fetch / Update Image
-            if not dest.get("image_url"):
-                new_image_url = _fetch_unsplash_image(dest["name"])
-                if new_image_url:
-                    dest["image_url"] = new_image_url
-                    needs_update = True
-                    
-            # Fetch / Cache Weather
-            final_lat = dest.get("latitude")
-            final_lon = dest.get("longitude")
-            if final_lat is not None and final_lon is not None:
-                weather_data = await get_weather_forecast(lat=float(final_lat), lon=float(final_lon))
-                if weather_data:
-                    if dest.get("metadata") is None:
-                        dest["metadata"] = {}
-                    dest["metadata"]["weather"] = weather_data
-                    needs_update = True
-            
-            if needs_update:
-                try:
-                    update_payload = {}
-                    if "latitude" in dest: update_payload["latitude"] = dest["latitude"]
-                    if "longitude" in dest: update_payload["longitude"] = dest["longitude"]
-                    if "image_url" in dest: update_payload["image_url"] = dest["image_url"]
-                    if "metadata" in dest: update_payload["metadata"] = dest["metadata"]
-                    supabase.table("destinations").update(update_payload).eq("id", dest["id"]).execute()
-                except Exception as e:
-                    print(f"Failed to update cache: {e}")
-            
-            # AI Enrichment (Check if missing or older than 30 days)
-            dest = await _enrich_destination_with_ai(dest)
+            # AI Enrichment + Data Recovery (Coordinates, Images, AI insights)
+            dest = await _enrich_destination_with_ai(dest, lat=lat, lon=lon)
             
             # Record view in history
             _record_search_history(user_id=user_payload.get("sub"), dest_id=dest["id"], query=name)
                     
             return dest
-    except Exception:
+    except Exception as e:
+        print(f"[Detail] Cache lookup error: {e}")
         pass
 
-    # 2. Not cached — fetch from Wikipedia and Unsplash
+    # 2. Not cached — create base record and then enrich
     description = _fetch_wikipedia_summary(name)
     image_url = _fetch_unsplash_image(name)
     
-    # Also find coordinates for new destination
-    final_lat, final_lon = lat, lon
-    if final_lat is None or final_lon is None:
-        coords = await _fetch_nominatim_coords(name, country)
-        if coords:
-            final_lat, final_lon = coords["lat"], coords["lon"]
-
-    # 3. Fetch Weather for new destination
-    metadata = {}
-    if final_lat is not None and final_lon is not None:
-        weather_data = await get_weather_forecast(lat=float(final_lat), lon=float(final_lon))
-        if weather_data:
-            metadata["weather"] = weather_data
-
     # 4. Insert into destinations table as cache
     new_dest = {
         "name": name,
         "country": country,
         "description": description or f"A destination in {country}.",
         "image_url": image_url,
-        "latitude": final_lat,
-        "longitude": final_lon,
-        "metadata": metadata,
+        "latitude": lat,
+        "longitude": lon,
+        "metadata": {},
         "tags": [],
     }
 
@@ -362,8 +302,8 @@ async def get_destination_by_name(
         if hasattr(insert_resp, "data") and len(insert_resp.data) > 0:
             dest = insert_resp.data[0]
             
-            # AI Enrichment for NEW destination
-            dest = await _enrich_destination_with_ai(dest)
+            # AI Enrichment + Data Recovery (Coordinates, Weather, AI insights)
+            dest = await _enrich_destination_with_ai(dest, lat=lat, lon=lon)
             
             dest["attractions"] = dest.get("attractions", [])
             # Record view in history
@@ -497,8 +437,8 @@ async def get_destination_by_id(
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Destination not found")
 
 
-async def _enrich_destination_with_ai(dest: dict) -> dict:
-    """Helper to check and trigger AI insights generation (duration, costs, seasonal attractions)."""
+async def _enrich_destination_with_ai(dest: dict, lat: Optional[float] = None, lon: Optional[float] = None) -> dict:
+    """Helper to check and trigger AI insights generation and data recovery (coords, images, weather)."""
     supabase = get_supabase()
     metadata = dest.get("metadata") or {}
     
@@ -506,15 +446,64 @@ async def _enrich_destination_with_ai(dest: dict) -> dict:
     last_gen_month = metadata.get("ai_generated_month")
     current_month = datetime.now().strftime("%B")
     
+    needs_update = False
     needs_ai = False
     
-    # Check if critical AI fields are missing (including attractions)
+    # 1. Coordinate Recovery
+    if dest.get("latitude") is None or dest.get("longitude") is None:
+        if lat is not None and lon is not None:
+            dest["latitude"] = lat
+            dest["longitude"] = lon
+            needs_update = True
+        else:
+            print(f"[Recovery] Fetching coordinates for {dest['name']}...")
+            coords = await _fetch_nominatim_coords(dest["name"], dest["country"])
+            if coords:
+                dest["latitude"] = coords["lat"]
+                dest["longitude"] = coords["lon"]
+                needs_update = True
+
+    # 2. Image Recovery
+    if not dest.get("image_url"):
+        print(f"[Recovery] Fetching image for {dest['name']}...")
+        new_image_url = _fetch_unsplash_image(dest["name"])
+        if new_image_url:
+            dest["image_url"] = new_image_url
+            needs_update = True
+
+    # 3. Weather Recovery/Update
+    current_lat = dest.get("latitude")
+    current_lon = dest.get("longitude")
+    if current_lat is not None and current_lon is not None:
+        # Check if weather is missing or older than 3 hours
+        weather = metadata.get("weather")
+        weather_time_str = metadata.get("weather_updated_at")
+        fetch_weather = False
+        
+        if not weather or not weather_time_str:
+            fetch_weather = True
+        else:
+            try:
+                weather_time = datetime.fromisoformat(weather_time_str)
+                if datetime.utcnow() - weather_time > timedelta(hours=3):
+                    fetch_weather = True
+            except Exception:
+                fetch_weather = True
+        
+        if fetch_weather:
+            print(f"[Recovery] Fetching weather for {dest['name']}...")
+            weather_data = await get_weather_forecast(lat=float(current_lat), lon=float(current_lon))
+            if weather_data:
+                metadata["weather"] = weather_data
+                metadata["weather_updated_at"] = datetime.utcnow().isoformat()
+                dest["metadata"] = metadata
+                needs_update = True
+
+    # 4. Check if AI Enrichment is needed
     if not dest.get("estimated_daily_cost_usd") or not dest.get("ideal_duration_min_days") or not dest.get("attractions"):
         needs_ai = True
-    # Check if we were generated for a DIFFERENT month (seasonal shift)
     elif last_gen_month != current_month:
         needs_ai = True
-    # Check for 30-day freshness
     elif last_updated_str:
         try:
             last_updated = datetime.fromisoformat(last_updated_str)
@@ -543,6 +532,7 @@ async def _enrich_destination_with_ai(dest: dict) -> dict:
             metadata["ai_updated_at"] = datetime.now().isoformat()
             metadata["ai_generated_month"] = current_month
             metadata["luxury_cost_inr"] = insights.get("luxury_daily_cost_inr")
+            dest["metadata"] = metadata
             update_payload["metadata"] = metadata
             
             try:
@@ -582,12 +572,26 @@ async def _enrich_destination_with_ai(dest: dict) -> dict:
                     else:
                         print(f"[AI] No attractions generated for {dest['name']}")
 
-                # Update local object
+                # Update local object with AI fields
                 dest.update(update_payload)
                 print(f"[AI] Successfully enriched {dest['name']} with budget and attractions.")
                 
             except Exception as e:
                 print(f"[AI] Failed to save AI insights to DB: {e}")
+    
+    # 5. If we recovered coords/image/weather but didn't run AI, we still need to save those changes
+    elif needs_update:
+        try:
+            update_payload = {
+                "latitude": dest.get("latitude"),
+                "longitude": dest.get("longitude"),
+                "image_url": dest.get("image_url"),
+                "metadata": dest.get("metadata")
+            }
+            supabase.table("destinations").update(update_payload).eq("id", dest["id"]).execute()
+            print(f"[Recovery] Successfully updated data for {dest['name']}.")
+        except Exception as e:
+            print(f"[Recovery] Failed to save recovered data: {e}")
                 
     return dest
 
@@ -716,6 +720,59 @@ class DestinationChatRequest(BaseModel):
     message: str
     description: str = ""
     history: List[ChatMessage] = []
+
+class RatingRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+
+@router.post("/{destination_id}/rate")
+def rate_destination(
+    destination_id: str,
+    req: RatingRequest,
+    user_payload: dict = Depends(get_current_user)
+):
+    """Submit or update a 1-5 Star rating for a destination."""
+    user_id = user_payload.get("sub")
+    supabase = get_supabase()
+
+    try:
+        # Upsert the rating
+        supabase.table("user_ratings").upsert({
+            "user_id": user_id,
+            "destination_id": destination_id,
+            "rating": req.rating,
+            "updated_at": datetime.now().isoformat()
+        }, on_conflict="user_id, destination_id").execute()
+        
+        return {"status": "success", "rating": req.rating}
+    except Exception as e:
+        print(f"[Rate] Error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit rating: {str(e)}"
+        )
+
+@router.get("/{destination_id}/user-rating")
+def get_user_destination_rating(
+    destination_id: str,
+    user_payload: dict = Depends(get_current_user)
+):
+    """Retrieve the current user's rating for a specific destination."""
+    user_id = user_payload.get("sub")
+    supabase = get_supabase()
+
+    try:
+        response = (
+            supabase.table("user_ratings")
+            .select("rating")
+            .eq("user_id", user_id)
+            .eq("destination_id", destination_id)
+            .execute()
+        )
+        if hasattr(response, "data") and len(response.data) > 0:
+            return response.data[0]
+        return {"rating": None}
+    except Exception:
+        return {"rating": None}
 
 @router.post("/chat")
 async def destination_chat(
