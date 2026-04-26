@@ -17,7 +17,23 @@ Itinera 2 follows a **Hybrid Cloud-Local Architecture**. The primary backend log
   - **Local**: [Ollama / Gemma:4b](https://ollama.com/) (Local LLM) for privacy-sensitive and low-latency travel insights.
 - **Server/Runtime**: Uvicorn (ASGI server).
 
-## 2. Directory & Module Mapping
+---
+
+## 2. Architectural Choices & Rationale
+
+| Technology | Role | Rationale ("Why did we choose this?") |
+|:---|:---|:---|
+| **Flutter** | Frontend | **Cross-Platform UI Mastery**: Chosen for its high-performance Impeller engine and rich Material 3 support, allowing a premium, animated experience on both iOS and Android from a single codebase. |
+| **Supabase** | DB & Auth | **Rapid Scalability**: We replaced traditional custom backends with Supabase to leverage managed PostgreSQL, real-time subscriptions, and built-in JWT-based authentication, reducing boilerplate code by 40%. |
+| **FastAPI** | Orchestration | **Python AI Ecosystem**: While Supabase handles data, FastAPI acts as the "Brain." We chose it for its native `async/await` support, which is critical for handling streaming responses from LLMs. |
+| **Gemini 1.5 Flash** | Cloud AI | **Large Context & Speed**: Its ability to process massive context (needed for multi-day itineraries) and high inference speed made it superior for structured data generation like checklists and budgets. |
+| **Ollama (Gemma)** | Local AI | **Privacy & Cost Control**: To avoid cloud latency and costs for simple Q&A, we integrated Ollama. It allows the app to provide destination chat insights without an internet connection or per-token fees. |
+| **Open-Meteo** | Weather | **Developer Friendly**: Chosen because it provides high-accuracy forecasts without requiring restrictive API keys or having aggressive rate limits during the development phase. |
+| **Unsplash/Wiki** | Content | **Rich Visuals**: Wikipedia provides the substance, while Unsplash provides the visual "wow" factor, ensuring every destination page feels authoritative and beautiful. |
+
+---
+
+## 3. Directory & Module Mapping
 
 The backend is organized into functional modules to ensure clear separation between the API interface, core logic, and data models.
 
@@ -37,7 +53,7 @@ The backend is organized into functional modules to ensure clear separation betw
 
 ---
 
-## 3. Authentication & Security
+## 4. Authentication & Security
 
 The system implements a robust, thread-safe authentication layer to satisfy both security and performance requirements.
 
@@ -53,7 +69,7 @@ The system implements a robust, thread-safe authentication layer to satisfy both
 
 ---
 
-## 3. Database Architecture (PostgreSQL)
+## 5. Database Architecture (PostgreSQL)
 
 The database is designed with extensibility and distributed systems in mind.
 
@@ -70,7 +86,7 @@ The database is designed with extensibility and distributed systems in mind.
 
 ---
 
-## 4. AI Orchestration Strategy
+## 6. AI Orchestration Strategy
 
 Itinera 2 distinguishes itself with a **Hybrid AI Strategy** that balances cost, latency, and capability.
 
@@ -92,7 +108,7 @@ Used for repetitive or informative tasks to reduce API costs and latency:
 
 ---
 
-## 5. Key Optimizations
+## 7. Key Optimizations
 
 ### **Weather Caching & Performance**
 - **Open-Meteo Integration**: A free, keyless API for weather data.
@@ -107,7 +123,7 @@ Used for repetitive or informative tasks to reduce API costs and latency:
 
 ---
 
-## 6. API Sequence & Data Flow (Viva Topic)
+## 8. API Sequence & Data Flow (Viva Topic)
 
 **Example: Generating a Trip Itinerary**
 1.  **Frontend**: POST `/api/trips/{id}/generate`
@@ -118,7 +134,7 @@ Used for repetitive or informative tasks to reduce API costs and latency:
 
 ---
 
-## 7. Troubleshooting & Debugging
+## 9. Troubleshooting & Debugging
 - Logs are tagged with `[AI]`, `[Weather]`, `[Security]`, and `[BG]` for easy filtering.
 - AI failure fallbacks provide static "Safe Defaults" so the app remains functional even if an LLM is unreachable.
 
